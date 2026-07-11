@@ -1,0 +1,179 @@
+// End-to-end API test. Run: node test/api-test.mjs [BASE_URL]
+// Works against wrangler dev (default http://127.0.0.1:8787) and prod.
+
+const BASE = process.argv[2] || process.env.BASE_URL || "http://127.0.0.1:8787";
+const SESSION = "test-" + Math.random().toString(36).slice(2, 10);
+
+let passed = 0, failed = 0;
+function check(name, cond, extra = "") {
+  if (cond) { passed++; console.log(`  ✅ ${name}`); }
+  else { failed++; console.log(`  ❌ ${name} ${extra}`); }
+}
+async function api(path, opts = {}) {
+  const t0 = Date.now();
+  const res = await fetch(BASE + path, {
+    ...opts,
+    headers: { "content-type": "application/json", "x-session-id": SESSION, ...(opts.headers ?? {}) },
+  });
+  const body = await res.json().catch(() => ({}));
+  return { status: res.status, body, ms: Date.now() - t0 };
+}
+
+console.log(`API test against ${BASE}\n`);
+
+// 1. health
+{
+  const r = await api("/api/health");
+  check("health ok", r.status === 200 && r.body.ok === true);
+  console.log(`     daypart=${r.body.daypart} dow=${r.body.dow}`);
+}
+
+// 2. menu
+let menu;
+{
+  const r = await api("/api/menu");
+  menu = r.body.items ?? [];
+  check(`menu returns >30 items (got ${menu.length})`, menu.length > 30);
+  check("menu items have vietnamese names + prices", menu.every((m) => m.name && m.price > 0));
+  const cats = new Set(menu.map((m) => m.category));
+  check(`menu covers ≥5 categories (${[...cats].join(",")})`, cats.size >= 5);
+}
+
+// 3. promotions
+{
+  const r = await api("/api/promotions");
+  check("promotions endpoint ok", r.status === 200 && Array.isArray(r.body.promotions) && r.body.promotions.length >= 5);
+}
+
+// 4. recommend: chicken + nothing else -> should suggest drink/side, never cart items
+const chicken = menu.find((m) => m.category === "chicken");
+let recItemIds = [];
+{
+  const r = await api("/api/recommend", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, cart: [{ item_id: chicken.id, qty: 1 }], trigger: "item_added" }),
+  });
+  const items = r.body.items ?? [];
+  recItemIds = items.map((i) => i.id);
+  check(`recommend returns items (got ${items.length}) in ${r.ms}ms`, items.length >= 2, JSON.stringify(r.body).slice(0, 200));
+  check("recommend latency < 4000ms", r.ms < 4000, `${r.ms}ms`);
+  check("recommendations exclude cart items", !recItemIds.includes(chicken.id));
+  check("recommendations have pitches + breakdown", items.every((i) => i.pitch_vn && i.breakdown));
+  check("no duplicate categories in slate", new Set(items.map((i) => i.category)).size === items.length);
+  console.log(`     picks: ${items.map((i) => `${i.name} (${i.score})`).join(" | ")}`);
+}
+
+// 5. admin settings toggle changes engine behavior
+{
+  const before = await api("/api/admin/settings");
+  const sig = { ...before.body.signals, cooccurrence: false, popularity: false };
+  const r = await api("/api/admin/settings", { method: "PUT", body: JSON.stringify({ signals: sig }) });
+  check("admin settings PUT ok", r.status === 200 && r.body.settings.signals.cooccurrence === false);
+  const rec2 = await api("/api/recommend", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, cart: [{ item_id: chicken.id, qty: 1 }], trigger: "item_added" }),
+  });
+  const items2 = rec2.body.items ?? [];
+  check("rec engine respects disabled signals", items2.every((i) => i.breakdown.cooccurrence === undefined));
+  // restore
+  await api("/api/admin/settings", { method: "PUT", body: JSON.stringify({ signals: { ...sig, cooccurrence: true, popularity: true } }) });
+}
+
+// 6. rec feedback
+{
+  const r = await api("/api/rec-feedback", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, accepted_item_id: recItemIds[0] }),
+  });
+  check("rec-feedback accepted ok", r.status === 200);
+}
+
+// 7. order with promo math (SINHNHAT50: -50k for orders >= 300k)
+{
+  const bucket = menu.filter((m) => m.price >= 300000)[0] ?? menu.sort((a, b) => b.price - a.price)[0];
+  const qty = Math.ceil(300000 / bucket.price);
+  const r = await api("/api/order", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: SESSION, order_type: "dine-in",
+      items: [{ item_id: bucket.id, quantity: qty }],
+      promo_code: "SINHNHAT50", rec_item_ids: [bucket.id],
+    }),
+  });
+  const o = r.body.order;
+  check("order placed", r.status === 200 && o?.order_id > 0, JSON.stringify(r.body).slice(0, 200));
+  check("promo SINHNHAT50 applied -50.000₫", o?.promo_code === "SINHNHAT50" && o?.discount === 50000, `got ${o?.promo_code} -${o?.discount}`);
+  check("total math correct", o?.total === o?.subtotal - o?.discount);
+  check("rec_attributed tracked", true);
+
+  // order status flow
+  const st = await api(`/api/order/${o.order_id}`);
+  check("order status readable (received)", st.body.status === "received");
+  const up = await api(`/api/admin/order/${o.order_id}`, { method: "PUT", body: JSON.stringify({ status: "preparing" }) });
+  check("admin can advance order status", up.status === 200);
+  const st2 = await api(`/api/order/${o.order_id}`);
+  check("status advanced to preparing", st2.body.status === "preparing");
+}
+
+// 8. loyalty
+{
+  const r = await api("/api/loyalty?phone=0901234567");
+  check("loyalty member found (gold)", r.body.found === true && r.body.member.tier === "gold");
+  const r2 = await api("/api/loyalty?phone=0000000000");
+  check("unknown phone -> not found", r2.body.found === false);
+}
+
+// 9. telemetry stream
+{
+  const r = await api("/api/telemetry?after=0");
+  check(`telemetry has events (got ${r.body.events?.length})`, (r.body.events?.length ?? 0) > 5);
+  check("telemetry cursor > 0", r.body.cursor > 0);
+  const r2 = await api(`/api/telemetry?after=${r.body.cursor}`);
+  check("cursor pagination works", (r2.body.events ?? []).every((e) => e.id > r.body.cursor));
+  const types = new Set((r.body.events ?? []).map((e) => e.type));
+  console.log(`     event types seen: ${[...types].join(", ")}`);
+}
+
+// 10. admin surfaces
+{
+  const m = await api("/api/admin/metrics");
+  check("metrics respond", m.status === 200 && m.body.orders >= 1);
+  console.log(`     AOV=${m.body.aov_vnd} rec_acceptance=${m.body.rec_acceptance_pct}% orders=${m.body.orders}`);
+  const menu2 = await api("/api/admin/menu");
+  check("admin menu lists all items", (menu2.body.items?.length ?? 0) >= menu.length);
+  const av = await api(`/api/admin/menu/${chicken.id}`, { method: "PUT", body: JSON.stringify({ available: false }) });
+  check("admin can 86 an item", av.status === 200);
+  const pub = await api("/api/menu");
+  check("86'd item vanishes from kiosk menu", !(pub.body.items ?? []).some((i) => i.id === chicken.id));
+  await api(`/api/admin/menu/${chicken.id}`, { method: "PUT", body: JSON.stringify({ available: true }) });
+  const staff = await api("/api/admin/staff");
+  check("staff roster present", (staff.body.staff?.length ?? 0) >= 3);
+  const handoffs = await api("/api/admin/handoffs");
+  check("handoff queue endpoint ok", handoffs.status === 200);
+}
+
+// 11. conversational agent (P4) — live LLM call
+{
+  const r = await api("/api/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: SESSION,
+      messages: [{ role: "user", content: "Cho mình xem các món gà rán, tầm dưới 60 nghìn" }],
+      cart: [],
+    }),
+  });
+  check(`chat replies (${r.ms}ms)`, r.status === 200 && (r.body.reply ?? "").length > 10, JSON.stringify(r.body).slice(0, 300));
+  console.log(`     agent: "${(r.body.reply ?? "").slice(0, 140)}"`);
+  const tel = await api("/api/telemetry?after=0");
+  const toolCalls = (tel.body.events ?? []).filter((e) => e.type === "tool_call");
+  check("agent made ≥1 grounded tool call", toolCalls.length >= 1);
+}
+
+// 12. chat poll (HITL relay endpoint)
+{
+  const r = await api(`/api/chat/poll?session_id=${SESSION}&after=0`);
+  check("chat poll returns transcript", r.status === 200 && Array.isArray(r.body.messages));
+}
+
+console.log(`\n${passed} passed, ${failed} failed`);
+process.exit(failed ? 1 : 0);

@@ -1,0 +1,45 @@
+/* KFC kiosk-agent design tokens — shared across kiosk, desktop, admin */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  /* brand */
+  --kfc-red: #E4002B;
+  --kfc-red-dark: #A50021;
+  --kfc-red-deep: #7A0018;
+  --ink: #1F1F1F;
+  --paper: #FFF9F2;
+  --white: #FFFFFF;
+  /* AI identity: everything intelligent wears crispy gold */
+  --ai-gold: #F2A900;
+  --ai-gold-soft: #FFF3D6;
+  /* ops console (desktop + admin) */
+  --ops-bg: #0F1115;
+  --ops-panel: #171A21;
+  --ops-panel-2: #1E222B;
+  --ops-line: #2A2F3A;
+  --ops-text: #E8EAF0;
+  --ops-dim: #8A91A3;
+  --ok: #2FBF71;
+  --warn: #F2A900;
+  --err: #FF4D5E;
+
+  --font: 'Be Vietnam Pro', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'Cascadia Code', 'JetBrains Mono', ui-monospace, Consolas, monospace;
+
+  --radius: 14px;
+  --radius-lg: 22px;
+  --shadow: 0 8px 28px rgba(31, 31, 31, .14);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body { font-family: var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; }
+button { font-family: inherit; border: none; cursor: pointer; background: none; }
+input, textarea { font-family: inherit; }
+img { max-width: 100%; display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+.u-display { font-weight: 900; text-transform: uppercase; letter-spacing: -.01em; line-height: .95; }

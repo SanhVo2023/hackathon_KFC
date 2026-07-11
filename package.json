@@ -1,0 +1,20 @@
+{
+  "name": "kfc-kiosk-agent",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "seed:gen": "node seed/generate.mjs",
+    "seed:local": "wrangler d1 execute kfc-catalog --local --file seed/seed.sql",
+    "seed:remote": "wrangler d1 execute kfc-catalog --remote --file seed/seed.sql",
+    "migrate:local": "wrangler d1 migrations apply kfc-catalog --local",
+    "migrate:remote": "wrangler d1 migrations apply kfc-catalog --remote",
+    "test:api": "node test/api-test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "wrangler": "^4.110.0"
+  }
+}

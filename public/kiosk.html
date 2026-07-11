@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%23E4002B%22/><text x=%2250%22 y=%2272%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Arial%22 font-weight=%22900%22>K</text></svg>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KFC — Kiosk tự đặt món</title>
+  <link rel="stylesheet" href="/shared.css" />
+  <link rel="stylesheet" href="/kiosk.css" />
+</head>
+<body class="kiosk-body">
+  <div id="kiosk">
+
+    <!-- ATTRACT -->
+    <section id="screen-attract" class="screen active">
+      <div class="attract-inner">
+        <div class="attract-logo">KFC</div>
+        <h1 class="attract-title u-display">Gà Rán<br />Giòn Tan<br />Chuẩn Vị</h1>
+        <p class="attract-sub" data-i18n="attract_sub">Đặt món ngay tại đây</p>
+        <button class="attract-cta" id="btn-start">
+          <span data-i18n="tap_to_start">Chạm để bắt đầu</span>
+        </button>
+        <div class="attract-ai">✦ <span data-i18n="attract_ai">Trợ lý AI gợi ý món hợp khẩu vị</span></div>
+      </div>
+    </section>
+
+    <!-- ORDER TYPE -->
+    <section id="screen-ordertype" class="screen">
+      <div class="ordertype-inner">
+        <h2 class="u-display" data-i18n="where_eat">Bạn dùng bữa ở đâu?</h2>
+        <div class="ordertype-cards">
+          <button class="ordertype-card" data-type="dine-in">
+            <span class="ot-icon">🍽️</span>
+            <span class="ot-label" data-i18n="dine_in">Ăn tại đây</span>
+          </button>
+          <button class="ordertype-card" data-type="takeaway">
+            <span class="ot-icon">🥡</span>
+            <span class="ot-label" data-i18n="takeaway">Mang đi</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- MENU -->
+    <section id="screen-menu" class="screen">
+      <div class="daypart-banner" id="daypart-banner"></div>
+      <div class="menu-layout">
+        <nav class="cat-rail" id="cat-rail"></nav>
+        <div class="menu-grid-wrap"><div class="menu-grid" id="menu-grid"></div></div>
+      </div>
+    </section>
+
+    <!-- CART -->
+    <section id="screen-cart" class="screen">
+      <div class="cart-inner">
+        <h2 class="u-display cart-title" data-i18n="your_order">Đơn của bạn</h2>
+        <div class="cart-lines" id="cart-lines"></div>
+        <div class="cart-recs" id="cart-recs"></div>
+        <div class="cart-extras">
+          <div class="extra-row">
+            <input id="voucher-input" placeholder="Mã khuyến mãi / Voucher" autocomplete="off" />
+            <button id="btn-voucher" class="chip-btn" data-i18n="apply">Áp dụng</button>
+          </div>
+          <div id="voucher-msg" class="extra-msg"></div>
+          <div class="extra-row">
+            <input id="loyalty-input" placeholder="SĐT thành viên / Member phone" inputmode="numeric" autocomplete="off" />
+            <button id="btn-loyalty" class="chip-btn" data-i18n="check">Kiểm tra</button>
+          </div>
+          <div id="loyalty-msg" class="extra-msg"></div>
+        </div>
+        <div class="cart-summary" id="cart-summary"></div>
+        <div class="cart-actions">
+          <button class="btn-secondary" id="btn-back-menu" data-i18n="add_more">+ Thêm món</button>
+          <button class="btn-primary" id="btn-checkout" data-i18n="checkout">Thanh toán</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAYMENT -->
+    <section id="screen-payment" class="screen">
+      <div class="payment-inner">
+        <h2 class="u-display" data-i18n="payment">Thanh toán</h2>
+        <div class="pay-total" id="pay-total"></div>
+        <div class="pay-methods" id="pay-methods">
+          <button class="pay-card" data-method="momo"><span class="pay-ic momo">M</span> MoMo</button>
+          <button class="pay-card" data-method="zalopay"><span class="pay-ic zalo">Z</span> ZaloPay</button>
+          <button class="pay-card" data-method="card"><span class="pay-ic card">💳</span> <span data-i18n="card">Thẻ</span></button>
+          <button class="pay-card" data-method="cash"><span class="pay-ic cash">💵</span> <span data-i18n="cash">Tiền mặt tại quầy</span></button>
+        </div>
+        <div class="pay-qr hidden" id="pay-qr">
+          <div class="qr-box" id="qr-box"></div>
+          <p data-i18n="scan_qr">Quét mã để thanh toán</p>
+          <div class="pay-spinner"></div>
+        </div>
+        <button class="btn-secondary" id="btn-back-cart" data-i18n="back">← Quay lại</button>
+      </div>
+    </section>
+
+    <!-- CONFIRM -->
+    <section id="screen-confirm" class="screen">
+      <div class="confirm-inner">
+        <div class="confirm-check">✓</div>
+        <h2 class="u-display" data-i18n="order_placed">Đặt món thành công!</h2>
+        <p data-i18n="order_number_is">Số đơn của bạn</p>
+        <div class="order-number" id="order-number">—</div>
+        <div class="order-status-track" id="order-status-track"></div>
+        <div class="confirm-summary" id="confirm-summary"></div>
+        <button class="btn-primary" id="btn-new-order" data-i18n="new_order">Bắt đầu đơn mới</button>
+      </div>
+    </section>
+
+    <!-- persistent header -->
+    <header class="kiosk-header" id="kiosk-header">
+      <button class="kh-logo" id="btn-home">KFC</button>
+      <div class="kh-store" id="kh-store">KFC Việt Nam</div>
+      <button class="kh-lang" id="btn-lang">EN</button>
+    </header>
+
+    <!-- persistent cart bar -->
+    <button class="cart-bar hidden" id="cart-bar">
+      <span class="cb-count" id="cb-count">0</span>
+      <span data-i18n="view_cart">Xem đơn hàng</span>
+      <span class="cb-total" id="cb-total">0₫</span>
+    </button>
+
+    <!-- AI rec bottom sheet (signature element) -->
+    <div class="rec-sheet-backdrop hidden" id="rec-backdrop"></div>
+    <div class="rec-sheet hidden" id="rec-sheet">
+      <div class="rec-sheet-head">
+        <span class="ai-badge">✦ AI</span>
+        <span id="rec-title" data-i18n="rec_title">Thường được gọi kèm</span>
+        <button class="rec-close" id="rec-close">✕</button>
+      </div>
+      <div class="rec-items" id="rec-items"></div>
+      <button class="rec-skip" id="rec-skip" data-i18n="no_thanks">Không, cảm ơn</button>
+    </div>
+
+    <!-- chat assistant -->
+    <button class="chat-fab hidden" id="chat-fab"><span class="ai-badge-round">✦</span><span data-i18n="chat_fab">Trợ lý AI</span></button>
+    <div class="chat-panel hidden" id="chat-panel">
+      <div class="chat-head">
+        <span class="ai-badge">✦ AI</span>
+        <span id="chat-title" data-i18n="chat_title">KFC Trợ Lý — đặt món bằng lời</span>
+        <button class="chat-close" id="chat-close">✕</button>
+      </div>
+      <div class="chat-handoff hidden" id="chat-handoff"></div>
+      <div class="chat-msgs" id="chat-msgs"></div>
+      <div class="chat-suggest" id="chat-suggest"></div>
+      <form class="chat-inputrow" id="chat-form">
+        <input id="chat-input" placeholder="Nhắn gì đó… / Type here…" autocomplete="off" />
+        <button type="submit" class="chat-send">➤</button>
+      </form>
+    </div>
+
+    <!-- item detail modal -->
+    <div class="item-modal-backdrop hidden" id="item-backdrop"></div>
+    <div class="item-modal hidden" id="item-modal"></div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script src="/lib.js"></script>
+  <script src="/kiosk.js"></script>
+</body>
+</html>

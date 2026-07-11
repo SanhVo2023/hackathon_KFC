@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%23E4002B%22/><text x=%2250%22 y=%2272%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Arial%22 font-weight=%22900%22>K</text></svg>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KFC Kiosk × Agentic AI — Live System View</title>
+  <link rel="stylesheet" href="/shared.css" />
+  <link rel="stylesheet" href="/desktop.css" />
+</head>
+<body class="desktop-body">
+  <header class="dt-header">
+    <div class="dt-brand"><span class="dt-logo">KFC</span> Kiosk <span class="dt-x">×</span> Agentic AI <span class="dt-sub">Live System View</span></div>
+    <div class="dt-stats" id="dt-stats"></div>
+    <nav class="dt-links">
+      <a href="/kiosk" target="_blank">Kiosk ↗</a>
+      <a href="/admin" target="_blank">Admin ↗</a>
+      <span class="dt-conn" id="dt-conn"><i></i> live</span>
+    </nav>
+  </header>
+
+  <main class="dt-main">
+    <section class="dt-kiosk">
+      <div class="kiosk-bezel">
+        <iframe id="kiosk-frame" src="/kiosk" title="KFC kiosk"></iframe>
+      </div>
+      <div class="kiosk-caption">Self-order kiosk — live, touch it</div>
+    </section>
+
+    <section class="dt-right">
+      <div class="dt-diagram-panel">
+        <div class="panel-title">SYSTEM DIAGRAM <span class="pt-hint">edges pulse as the agent works</span></div>
+        <svg id="diagram" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="dt-log-panel">
+        <div class="panel-title">EVENT STREAM <span class="pt-hint" id="log-count"></span></div>
+        <div class="log-scroll" id="log-scroll"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/lib.js"></script>
+  <script src="/desktop.js"></script>
+</body>
+</html>
