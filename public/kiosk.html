@@ -11,12 +11,15 @@
 <body class="kiosk-body">
   <div id="kiosk">
 
-    <!-- ATTRACT -->
+    <!-- ATTRACT — food-first hero, like the real idle screens -->
     <section id="screen-attract" class="screen active">
+      <div class="attract-hero" aria-hidden="true"></div>
+      <div class="attract-scrim" aria-hidden="true"></div>
       <div class="attract-inner">
         <img class="attract-logo" src="/brand/kfc-logo.png" alt="KFC" />
         <h1 class="attract-title u-display">Gà Rán<br />Giòn Tan<br />Chuẩn Vị</h1>
         <p class="attract-sub" data-i18n="attract_sub">Đặt món ngay tại đây</p>
+        <div class="attract-ticker" id="attract-ticker" aria-hidden="true"></div>
         <button class="attract-cta" id="btn-start">
           <span data-i18n="tap_to_start">Chạm để bắt đầu</span>
         </button>

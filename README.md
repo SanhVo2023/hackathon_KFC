@@ -54,6 +54,22 @@ Gà — vẫn đủ món bạn chọn mà tiết kiệm 13.000₫!"* — like a 
 customer's side. Combos carry machine-readable contents, so the engine also **never
 recommends a cola on top of a combo that already includes one.**
 
+### 0c. Buyer psychology, made operational (not just claimed)
+The upsell strategy implements the QSR playbook from menu-engineering research, and every
+recommendation carries a **strategy label** on the ops view so you can see the play behind it:
+- **Cross-subsidization** (`cross_subsidy` 🥤): fountain drinks run >90% margin and carry the
+  economics of every combo. Protein in the cart with no drink anywhere → the slate *must*
+  lead with a drink. Enforced in the engine, verified in the test suite.
+- **Asymmetric dominance (decoy)** (upsize step): 3 tiers — Vừa +0 / Lớn +10.000₫ /
+  **Đại +12.000₫**. The middle tier exists to make the jumbo feel like the obviously smart
+  choice; the event stream narrates "decoy landed" when it works. (Decoy tiers are
+  synthesized demo pricing, not real KFC prices.)
+- **Embroidered cognition** (pitch copy): sensory adjectives ("giòn rụm", "nóng hổi",
+  "mát lạnh") make the brain simulate the bite — wired into both the LLM pitch prompt and
+  every deterministic fallback line.
+- **Loss aversion** ("TIẾT KIỆM 8.000₫" flags + the kindness-first swap above) — framing
+  the combo as avoiding a loss, not gaining an upsell.
+
 ### 1. Recommendation engine (P2) — deterministic scoring × LLM voice
 **Context = customer hypothesis × store cluster × location × time × day/holiday × inventory × promos × cart.**
 Every rec moment (item added, cart review, agent tool call) runs an **8-signal scorer** over
@@ -99,12 +115,22 @@ kiosk UI (the agent's `add_to_cart` visibly drops items into the kiosk cart).
 staff member. Staff see the queue + full transcript in `/admin`, reply live (relayed to the
 kiosk chat), and resolve — the AI then resumes the session.
 
-### 3. Live system diagram
+### 3. Live system diagram + live recommendation window
 The Worker batches telemetry for every API call, tool call, D1 query, LLM call and staff
 event into D1 (`ctx.waitUntil`, never blocking the hot path). The desktop view polls a
 cursor and pulses the corresponding edges (gold = AI, red = customer, green = human);
 kiosk UI events arrive instantly via `postMessage`. Judges watch the architecture work
 in real time.
+
+Under the hypothesis panel, **"MÓN AI SẼ GỢI Ý NGAY LÚC NÀY"** shows the *actual dishes*
+(photos, prices, pitch lines) the engine would serve this customer at this second — with
+the strategy chip on each slot — re-probed on every hypothesis update and cart change.
+These probes skip impression logging so acceptance metrics stay honest.
+
+The **🎬 Scenario Director** is three iconic one-tap situations: ① Trưa văn phòng
+② Tối cuối tuần ở TTTM (Zinger sold out) ③ Đêm Giáng Sinh (holiday mode + Noel promo +
+festive kiosk skin + dessert overstock). Store, time, inventory and promotions all move
+together.
 
 ### 4. Admin control center (for non-technical staff)
 Overview (AOV uplift hero metric), order production board (kanban: received → preparing →
@@ -112,11 +138,17 @@ ready → completed), HITL support queue with live chat takeover, AI settings (s
 LLM pitch on/off, slots), menu 86-ing, promotion toggles, live event log. All Vietnamese-first.
 
 ## Data — crawled + synthetic
-- **Menu:** real KFC Vietnam items, prices and official images, crawled from
-  kfcvietnam.com.vn with **TinyFish** (two agent runs: items+prices, then a 92-image sweep),
-  merged with a curated catalog for category coverage → 48 items. The last 10 missing product
-  photos were generated with **Gemini (gemini-2.5-flash-image)** in KFC menu-board style
-  (`seed/gen-images.mjs`, key via env only).
+- **Menu:** the **complete KFC Vietnam menu** — 92 items across all 8 site categories
+  (Ưu Đãi, Món Mới, Combo 1 Người, Combo Nhóm, Gà Rán - Gà Quay, Burger - Cơm - Mì Ý,
+  Thức Ăn Nhẹ, Thức Uống & Tráng Miệng) with real names, prices and official images,
+  crawled from kfcvietnam.com.vn with **TinyFish**, plus a small curated layer for
+  category coverage and the Christmas seasonal combos → **106 items, every one with a
+  photo**. Missing product photos and the attract-screen heroes were generated with
+  **Gemini (gemini-2.5-flash-image)** in KFC menu-board style (`seed/gen-images.mjs`,
+  key via env only).
+- **Holiday calendar:** includes **Christmas (Dec 24–25)** with seasonal combos
+  (Combo Gà Quay Giáng Sinh, Party Bucket Noel), a scenario-bound NOEL promotion and a
+  festive kiosk skin — staged in one tap from the Scenario Director.
 - **POS history:** 9,000 synthetic transactions over 90 days across 6 stores in 4 site
   clusters, with cluster-specific daypart/basket archetypes → precomputed co-occurrence and
   popularity per cluster × daypart. Per-store inventory (stock vs par level) + holiday calendar.
@@ -151,12 +183,14 @@ npx wrangler d1 create kfc-catalog        # once; put the id in wrangler.jsonc
 node seed/generate.mjs                    # crawl JSON + synth → seed/seed.sql
 npm run migrate:local && npm run seed:local
 npm run dev                               # http://127.0.0.1:8787
-npm run test:api                          # 34 end-to-end assertions
+npm run test:api                          # 68 end-to-end assertions
 npx wrangler deploy                       # + migrate:remote + seed:remote
 ```
 
 ## Tests
-`test/api-test.mjs` — 34 assertions covering menu, rec constraints/latency, signal toggles,
+`test/api-test.mjs` — 68 assertions covering menu (full-crawl size), rec constraints/latency,
+strategy labels, the cross-subsidy rule, ops-probe metric honesty, the Christmas scenario
+round-trip, signal toggles,
 promo math, order lifecycle, loyalty, telemetry cursor, admin surfaces, live agent turn with
 grounded tool calls. Run against local or prod (`node test/api-test.mjs <url>`).
 `test/chat-probe.mjs` — agent reliability probe (tool usage, language, latency per turn).

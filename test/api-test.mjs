@@ -190,12 +190,13 @@ let recItemIds = [];
   console.log(`     office/lunch: ${(simA.body.items ?? []).map((i) => i.name).join(" | ")}`);
   console.log(`     mall/dinner:  ${(simB.body.items ?? []).map((i) => i.name).join(" | ")}`);
 
-  // per-store inventory: Burger Zinger is 86'd at store 2 (mall), in stock at store 1
+  // per-store inventory: the Zinger burger is 86'd at store 2 (mall), in stock at store 1
+  const isZinger = (i) => /burger/i.test(i.name) && /zinger/i.test(i.name) && !i.is_combo;
   const menu1 = await api("/api/menu?store_id=1");
   const menu2 = await api("/api/menu?store_id=2");
-  const zin1 = (menu1.body.items ?? []).some((i) => i.name === "Burger Zinger");
-  const zin2 = (menu2.body.items ?? []).some((i) => i.name === "Burger Zinger");
-  check("store 1 sells Burger Zinger, store 2 (out of stock) hides it", zin1 && !zin2, `s1=${zin1} s2=${zin2}`);
+  const zin1 = (menu1.body.items ?? []).some(isZinger);
+  const zin2 = (menu2.body.items ?? []).some(isZinger);
+  check("store 1 sells the Zinger burger, store 2 (out of stock) hides it", zin1 && !zin2, `s1=${zin1} s2=${zin2}`);
 
   // forecast
   const fc = await api("/api/admin/forecast");
@@ -294,11 +295,64 @@ let recItemIds = [];
   check("scenario set", set.status === 200);
   const m2 = await api("/api/menu");
   check("menu follows scenario (store 2, dinner)", m2.body.store?.id === 2 && m2.body.daypart === "dinner" && m2.body.scenario === "test-scenario");
-  check("scenario inventory respected (Zinger hidden at store 2)", !(m2.body.items ?? []).some((i) => i.name === "Burger Zinger"));
+  check("scenario inventory respected (Zinger hidden at store 2)", !(m2.body.items ?? []).some((i) => /burger/i.test(i.name) && /zinger/i.test(i.name) && !i.is_combo));
   const clear = await api("/api/admin/scenario", { method: "POST", body: JSON.stringify({ scenario: null }) });
   check("scenario cleared to real time", clear.status === 200);
   const m3 = await api("/api/menu");
   check("menu back on real store", m3.body.scenario == null);
+}
+
+// 15c. psychology layer: strategy labels + cross-subsidy drink rule
+{
+  const r = await api("/api/recommend", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, cart: [{ item_id: chicken.id, qty: 1 }], trigger: "item_added" }),
+  });
+  const items = r.body.items ?? [];
+  check("every rec carries a strategy label", items.length > 0 && items.every((i) => typeof i.strategy === "string" && i.strategy.length > 0), JSON.stringify(items.map((i) => i.strategy)));
+  // chicken in cart, no drink anywhere → slate must lead with a drink (cross-subsidy)
+  const lead = items[0];
+  check("cross-subsidy: drink attach leads the slate for a drinkless chicken cart",
+    lead?.category === "drink" && lead?.strategy === "cross_subsidy",
+    `lead=${lead?.name} (${lead?.category}/${lead?.strategy})`);
+  console.log(`     strategies: ${items.map((i) => `${i.name}→${i.strategy}`).join(" | ")}`);
+
+  // full menu: the crawl brought the real catalog
+  check(`full-menu crawl live (menu ≥ 90 items, got ${menu.length})`, menu.length >= 90);
+}
+
+// 15d. ops-panel probe: instant, and never pollutes acceptance metrics
+{
+  const before = await api("/api/admin/metrics");
+  const r = await api("/api/recommend", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, cart: [{ item_id: chicken.id, qty: 1 }], trigger: "ops_panel" }),
+  });
+  const after = await api("/api/admin/metrics");
+  check(`ops_panel probe returns dishes fast (${r.ms}ms)`, r.status === 200 && (r.body.items?.length ?? 0) >= 2 && r.ms < 2500);
+  check("ops_panel probe logs no rec impression (honest metrics)", after.body.rec_impressions === before.body.rec_impressions,
+    `before=${before.body.rec_impressions} after=${after.body.rec_impressions}`);
+}
+
+// 15e. Christmas scenario: holiday + Noel promo + seasonal combos
+{
+  const set = await api("/api/admin/scenario", {
+    method: "POST",
+    body: JSON.stringify({
+      scenario: { label: "Đêm Giáng Sinh 🎄", store_id: 1, daypart: "dinner", dow: 4, holiday: "Đêm Giáng Sinh" },
+      promo_code: "NOEL",
+    }),
+  });
+  check("xmas scenario set", set.status === 200);
+  const m = await api("/api/menu");
+  check("kiosk context shows the holiday", m.body.holiday === "Đêm Giáng Sinh" && m.body.festive === true, `holiday=${m.body.holiday}`);
+  check("Christmas combos on the menu", (m.body.items ?? []).some((i) => /giáng sinh|noel/i.test(i.name)));
+  const promos = await api("/api/promotions");
+  check("NOEL promo activated by the scenario", (promos.body.promotions ?? []).some((p) => p.code === "NOEL"));
+  const clear = await api("/api/admin/scenario", { method: "POST", body: JSON.stringify({ scenario: null, promo_code: null }) });
+  check("xmas scenario cleared", clear.status === 200);
+  const promos2 = await api("/api/promotions");
+  check("NOEL promo deactivated on clear", !(promos2.body.promotions ?? []).some((p) => p.code === "NOEL"));
 }
 
 // 16. chat poll (HITL relay endpoint)

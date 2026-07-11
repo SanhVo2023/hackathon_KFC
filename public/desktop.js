@@ -118,7 +118,7 @@
   function handleTelemetry(e) {
     if (e.node_from && e.node_to) pulse(e.node_from, e.node_to, colorFor(e));
     else if (e.node_from) glow(e.node_from);
-    if (e.type === "profile_updated") renderProfile(e);
+    if (e.type === "profile_updated") { renderProfile(e); queueOpsRecs(); }
     addLog(e.source, e.label ?? e.type, e.duration_ms, e.created_at);
   }
 
@@ -149,6 +149,50 @@
       </div>
       <div class="pf-biases"><div class="pf-bias-title">thiên hướng gợi ý</div>${bars}</div>`;
   }
+
+  // ---------- live "what the AI would recommend right now" strip ----------
+  // The actual dishes the engine would serve THIS customer at THIS moment,
+  // re-probed on every hypothesis update and cart change. Ops-only: the
+  // strategy label explains the psychology play behind each slot.
+  const STRATEGY_VI = {
+    cross_subsidy: ["🥤", "Bù chéo lợi nhuận"], persona_match: ["👁", "Khớp chân dung"],
+    cooccurrence: ["🧺", "Hay mua cùng"], promo: ["🏷️", "Khuyến mãi"],
+    inventory_push: ["📦", "Đẩy tồn kho"], daypart_fit: ["🕐", "Hợp khung giờ"],
+    margin_play: ["💰", "Biên LN cao"], affinity: ["🔗", "Món hợp vị"], popular: ["⭐", "Bán chạy"],
+  };
+  let opsRecTimer = null;
+  function queueOpsRecs() { clearTimeout(opsRecTimer); opsRecTimer = setTimeout(refreshOpsRecs, 800); }
+  async function refreshOpsRecs() {
+    let sessionId = null, cart = [];
+    try {
+      const w = $("#kiosk-frame").contentWindow;
+      sessionId = w.KFC.sessionId;
+      cart = w.KFC.cartLines ? w.KFC.cartLines() : [];
+    } catch (_) { return; } // kiosk not embedded
+    if (!sessionId) return;
+    try {
+      const out = await api("/api/recommend", { method: "POST", body: { session_id: sessionId, cart, trigger: "ops_panel" } });
+      const items = (out.items ?? []).slice(0, 3);
+      const box = $("#pf-recs");
+      if (!items.length) { box.hidden = true; return; }
+      box.hidden = false;
+      pulse("profiler", "rec", "");
+      $("#pf-recs-row").innerHTML = items.map((r) => {
+        const [ic, lbl] = STRATEGY_VI[r.strategy] ?? ["✨", r.strategy ?? ""];
+        return `<div class="pfr-card">
+          ${r.image_url ? `<img src="${r.image_url}" alt="" loading="lazy" />` : `<div class="pfr-ph">🍗</div>`}
+          <div class="pfr-body">
+            <b>${r.name}</b>
+            <span class="pfr-price">${r.price_display}</span>
+            <small class="pfr-pitch"></small>
+          </div>
+          <span class="pfr-chip" data-s="${r.strategy}">${ic} ${lbl}</span>
+        </div>`;
+      }).join("");
+      $$("#pf-recs-row .pfr-pitch").forEach((el, i) => { el.textContent = items[i].pitch_vn ?? ""; });
+    } catch (_) { /* strip is best-effort */ }
+  }
+  setTimeout(refreshOpsRecs, 2500);   // first probe once the kiosk booted
 
   // ---------- polling ----------
   let cursor = 0;
@@ -196,6 +240,8 @@
     if (["add_to_cart", "rec_request", "voucher", "payment"].includes(m.type)) pulse("kiosk", "worker", "red");
     if (m.type === "rec_accepted") pulse("kiosk", "rec", "");
     if (m.type === "handoff") pulse("agent", "staff", "green");
+    // cart or session changed → re-probe what the AI would suggest now
+    if (["add_to_cart", "rec_accepted", "session_start", "payment"].includes(m.type)) queueOpsRecs();
     addLog("ui", m.label ?? m.type, null);
   });
 
@@ -248,18 +294,16 @@
     ev.target.value = "";
   });
 
-  // ---------- scenario director ----------
+  // ---------- scenario director — 3 iconic situations, one tap each ----------
   const PRESETS = [
-    { key: "office-lunch", icon: "🏢", title: "Trưa văn phòng", sub: "Landmark 81 · T3 · 12:00",
+    { key: "office-lunch", icon: "🏢", title: "Trưa văn phòng", sub: "Landmark 81 · Thứ 3 · 12:00 — dân công sở cần nhanh",
       scenario: { label: "Trưa văn phòng", store_id: 3, daypart: "lunch", dow: 2, holiday: null } },
-    { key: "mall-weekend", icon: "🛍️", title: "Tối T7 ở TTTM", sub: "Vincom · T7 · 19:00 · Zinger hết",
+    { key: "mall-weekend", icon: "🛍️", title: "Tối cuối tuần ở TTTM", sub: "Vincom · Thứ 7 · 19:00 — gia đình đông, Zinger hết hàng",
       scenario: { label: "Tối T7 TTTM", store_id: 2, daypart: "dinner", dow: 6, holiday: null }, inventory: "zinger_out" },
-    { key: "tourist-late", icon: "🌙", title: "Đêm phố Tây", sub: "Bùi Viện · T6 · 22:30",
-      scenario: { label: "Đêm phố Tây", store_id: 4, daypart: "late", dow: 5, holiday: null } },
-    { key: "holiday-res", icon: "🎉", title: "Lễ 2/9 khu dân cư", sub: "Ng. Văn Trỗi · lễ · tối · dư kem",
-      scenario: { label: "Lễ Quốc khánh 2/9", store_id: 1, daypart: "dinner", dow: 3, holiday: "Quốc khánh 2/9" }, inventory: "dessert_over" },
+    { key: "xmas-eve", icon: "🎄", title: "Đêm Giáng Sinh", sub: "Khu dân cư · 24/12 · tối — combo Noel, dư tráng miệng",
+      scenario: { label: "Đêm Giáng Sinh 🎄", store_id: 1, daypart: "dinner", dow: 4, holiday: "Đêm Giáng Sinh" },
+      inventory: "dessert_over", promo_code: "NOEL" },
   ];
-  const DAYPARTS = { breakfast: "Sáng", lunch: "Trưa", tea: "Xế", dinner: "Tối", late: "Đêm muộn" };
 
   const drawer = $("#scenario-drawer");
   $("#scenario-btn").addEventListener("click", () => { drawer.hidden = !drawer.hidden; });
@@ -270,22 +314,22 @@
       <span class="sdp-icon">${p.icon}</span>
       <span class="sdp-body"><b>${p.title}</b><small>${p.sub}</small></span>
     </button>`).join("");
-  $("#sd-daypart").innerHTML = Object.entries(DAYPARTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
 
-  async function initScenarioControls() {
+  (async () => {
     try {
-      const r = await api("/api/admin/stores");
-      $("#sd-store").innerHTML = (r.stores ?? []).map((s) => `<option value="${s.id}">${s.name} (${s.cluster})</option>`).join("");
       const settings = await api("/api/admin/settings");
       if (settings.scenario?.label) $("#scenario-label").textContent = settings.scenario.label;
-    } catch (_) { /* controls stay empty until reachable */ }
-  }
-  initScenarioControls();
+    } catch (_) { /* label stays default until reachable */ }
+  })();
 
-  async function applyScenario(scenario, inventoryPreset) {
+  async function applyScenario(scenario, inventoryPreset, promoCode) {
     await api("/api/admin/scenario", {
       method: "POST",
-      body: { scenario, ...(inventoryPreset ? { inventory_preset: inventoryPreset, store_id: scenario?.store_id } : {}) },
+      body: {
+        scenario,
+        ...(inventoryPreset ? { inventory_preset: inventoryPreset, store_id: scenario?.store_id } : {}),
+        promo_code: promoCode ?? null,   // null on clear → scenario promos deactivate
+      },
     });
     $("#scenario-label").textContent = scenario?.label ?? "Thời gian thực";
     document.querySelector(".dt-header").classList.toggle("scenario-on", !!scenario);
@@ -294,28 +338,16 @@
     const frame = $("#kiosk-frame");
     if (frame) frame.contentWindow.postMessage({ kfcScenario: true }, "*");
     drawer.hidden = true;
+    queueOpsRecs();
   }
 
   $("#sd-presets").addEventListener("click", (e) => {
     const btn = e.target.closest(".sd-preset");
     if (!btn) return;
     const p = PRESETS.find((x) => x.key === btn.dataset.key);
-    applyScenario(p.scenario, p.inventory);
-  });
-  $("#sd-apply").addEventListener("click", () => {
-    applyScenario({
-      label: "Kịch bản tùy chỉnh",
-      store_id: Number($("#sd-store").value),
-      daypart: $("#sd-daypart").value,
-      dow: Number($("#sd-dow").value),
-      holiday: $("#sd-holiday").checked ? "Ngày lễ (demo)" : null,
-    });
+    applyScenario(p.scenario, p.inventory, p.promo_code);
   });
   $("#sd-clear").addEventListener("click", () => applyScenario(null));
-  drawer.addEventListener("click", (e) => {
-    const inv = e.target.closest("[data-inv]");
-    if (inv) api("/api/admin/scenario", { method: "POST", body: { inventory_preset: inv.dataset.inv, store_id: Number($("#sd-store").value) || 1 } });
-  });
 
   drawStatic();
 })();

@@ -30,6 +30,7 @@ export interface Recommendation {
   pitch_vn: string; pitch_en: string;
   score: number; breakdown: Record<string, number>;
   promo_code: string | null; co_pct: number | null;
+  strategy: string;   // the buyer-psychology play behind this slot (ops-facing)
 }
 
 export interface RecOverrides { store_id?: number; daypart?: Daypart }
@@ -246,6 +247,40 @@ export async function recommend(
     if (slate.length >= slots) break;
   }
 
+  // ---------- psychology: cross-subsidization (QSR economics — fountain drinks
+  // run >90% margin and carry the combo's profitability). Protein in the cart
+  // with no drink anywhere → the slate MUST lead with a drink.
+  const hasProtein = cartItems.some((i) => i.is_combo || i.category === "chicken" || i.category === "burger-rice");
+  const drinkCovered = cartItems.some((i) => i.category === "drink") || coveredCats.has("drink");
+  let crossSubsidyId: number | null = null;
+  if (hasProtein && !drinkCovered) {
+    let drink = slate.find((s) => s.m.category === "drink");
+    if (!drink) {
+      drink = scored.find((s) => s.m.category === "drink");
+      if (drink) {
+        if (slate.length >= slots) slate.pop();
+        slate.push(drink);
+      }
+    }
+    if (drink) {
+      crossSubsidyId = drink.m.id;
+      slate.sort((a, b) => (a.m.id === crossSubsidyId ? -1 : b.m.id === crossSubsidyId ? 1 : 0));
+      tel.emit("strategy", "rec", "worker", `cross-subsidy: gà cần nước — drink attach leads the slate (${drink.m.name})`, { item: drink.m.name, margin_pct: drink.m.margin_pct });
+    }
+  }
+
+  // the buyer-psychology play behind each slot (ops-facing label)
+  const STRATEGY_BY_SIGNAL: Record<string, string> = {
+    cooccurrence: "cooccurrence", persona: "persona_match", promo: "promo",
+    inventory: "inventory_push", daypart: "daypart_fit", margin: "margin_play",
+    affinity: "affinity", popularity: "popular",
+  };
+  const strategyOf = (s: { m: Candidate; breakdown: Record<string, number> }): string => {
+    if (s.m.id === crossSubsidyId) return "cross_subsidy";
+    const top = Object.entries(s.breakdown).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])[0];
+    return top ? (STRATEGY_BY_SIGNAL[top[0]] ?? "popular") : "popular";
+  };
+
   tel.emit("rec_scored", "rec", "worker", `scored ${candidates.length} candidates → top ${slate.length} [${store.cluster}/${daypart}${festive ? "/festive" : ""}]`, {
     store: store.name, cluster: store.cluster,
     top: slate.map((s) => ({ id: s.m.id, name: s.m.name, score: +s.score.toFixed(3), breakdown: Object.fromEntries(Object.entries(s.breakdown).map(([k, v]) => [k, +v.toFixed(3)])) })),
@@ -267,18 +302,20 @@ export async function recommend(
   const recs: Recommendation[] = slate.map((s) => {
     const coPct = attachPct(s.m.id);
     const promo = activePromos.find((p) => (p.item_id != null && p.item_id === s.m.id) || (p.scope_category != null && p.scope_category === s.m.category));
+    const strategy = strategyOf(s);
     return {
       id: s.m.id, name: s.m.name, name_en: s.m.name_en, category: s.m.category,
       price: s.m.price, price_display: VND(s.m.price), image_url: s.m.image_url,
-      pitch_vn: fallbackPitch(s.m, coPct, promo, "vi"),
-      pitch_en: fallbackPitch(s.m, coPct, promo, "en"),
+      pitch_vn: fallbackPitch(s.m, coPct, promo, "vi", strategy),
+      pitch_en: fallbackPitch(s.m, coPct, promo, "en", strategy),
       score: +s.score.toFixed(3), breakdown: Object.fromEntries(Object.entries(s.breakdown).map(([k, v]) => [k, +v.toFixed(3)])),
-      promo_code: promo?.code ?? null, co_pct: coPct,
+      promo_code: promo?.code ?? null, co_pct: coPct, strategy,
     };
   });
 
-  // Layer 2: LLM pitch (raced against timeout, falls back to deterministic copy)
-  if (settings.llm_pitch !== false && recs.length && cartItems.length) {
+  // Layer 2: LLM pitch (raced against timeout, falls back to deterministic copy).
+  // ops_panel probes want instant deterministic copy — skip the LLM.
+  if (settings.llm_pitch !== false && recs.length && cartItems.length && trigger !== "ops_panel") {
     const tLlm = Date.now();
     tel.emit("llm_call", "rec", "llm", "pitch generation (gpt-oss-120b)", { items: recs.map((r) => r.name) });
     try {
@@ -301,8 +338,8 @@ export async function recommend(
     }
   }
 
-  // log impression for acceptance metrics (simulator runs don't count)
-  if (trigger !== "simulator") {
+  // log impression for acceptance metrics (simulator/ops-panel probes don't count)
+  if (trigger !== "simulator" && trigger !== "ops_panel") {
     await env.DB.prepare(
       "INSERT INTO rec_events (session_id, trigger, anchor_items, shown_items) VALUES (?,?,?,?)",
     ).bind(sessionId, trigger, JSON.stringify(cartIds), JSON.stringify(recs.map((r) => r.id))).run();
@@ -311,19 +348,36 @@ export async function recommend(
   return { items: recs, smart_swap: smartSwap, daypart, store, festive, holiday, signals_used: enabled };
 }
 
-function fallbackPitch(m: MenuItem, coPct: number | null, promo: Promo | undefined, lang: "vi" | "en"): string {
+// "embroidered cognition": sensory adjectives make the brain simulate the bite —
+// reading "giòn rụm" fires the texture/sound neurons before the food exists.
+const SENSORY: Record<string, { vi: string; en: string }> = {
+  chicken: { vi: "giòn rụm nóng hổi", en: "crackling hot & crispy" },
+  "burger-rice": { vi: "nóng hổi đậm đà", en: "steaming & savory" },
+  snack: { vi: "giòn tan", en: "golden crunchy" },
+  drink: { vi: "mát lạnh sảng khoái", en: "ice-cold & fizzy" },
+  dessert: { vi: "mát lịm ngọt dịu", en: "silky sweet" },
+  combo: { vi: "đầy đặn nóng giòn", en: "hearty & fresh-fried" },
+};
+
+function fallbackPitch(m: MenuItem, coPct: number | null, promo: Promo | undefined, lang: "vi" | "en", strategy?: string): string {
   const name = lang === "en" && m.name_en ? m.name_en : m.name;
+  const sens = SENSORY[m.category]?.[lang] ?? "";
+  if (strategy === "cross_subsidy") {
+    return lang === "vi"
+      ? `Gà nóng cần ngụm ${sens} — thêm ${name} nhé?`
+      : `Hot chicken needs something ${sens} — add ${name}?`;
+  }
   if (promo) {
     return lang === "vi"
-      ? `${name} — đang có ưu đãi ${promo.name}!`
-      : `${name} — "${promo.name}" promo is on right now!`;
+      ? `${name} ${sens} — đang có ưu đãi ${promo.name}!`
+      : `${name}, ${sens} — "${promo.name}" promo is on right now!`;
   }
   if (coPct) {
     return lang === "vi"
-      ? `${coPct}% khách chọn món giống bạn cũng thêm ${name}.`
-      : `${coPct}% of customers with your order also add ${name}.`;
+      ? `${coPct}% khách chọn món giống bạn cũng thêm ${name} ${sens}.`
+      : `${coPct}% of customers with your order also add ${name} — ${sens}.`;
   }
-  return lang === "vi" ? `Thêm ${name} chỉ ${VND(m.price)} cho bữa thêm trọn vị.` : `Add ${name} for just ${VND(m.price)}.`;
+  return lang === "vi" ? `Thêm ${name} ${sens} chỉ ${VND(m.price)}.` : `Add ${name}, ${sens}, for just ${VND(m.price)}.`;
 }
 
 async function llmPitch(
@@ -340,7 +394,7 @@ async function llmPitch(
 Cart: ${cartItems.map((i) => i.name).join(", ")}.${comboInsides.length ? ` NOTE — ${comboInsides.join("; ")}. Pitches must COMPLEMENT what the cart already contains, never duplicate it.` : ""}
 ${persona ? `Customer hypothesis (a guess — use the vibe, never state it literally): ${persona}. Tailor the tone (e.g. family → kids/sharing angle, office worker → quick/refreshing angle).` : ""}
 Candidates (with data-driven reasons): ${JSON.stringify(recs.map((r) => ({ id: r.id, name: r.name, price: r.price_display, attach_pct: r.co_pct, promo: r.promo_code })))}.
-For EACH candidate return one short, appetizing pitch line (max 14 words) in Vietnamese and English. Mention the attach_pct stat or promo when present. Return ONLY JSON:
+For EACH candidate return one short, appetizing pitch line (max 14 words) in Vietnamese and English. Mention the attach_pct stat or promo when present. Use SENSORY words that make the reader taste it (giòn rụm, nóng hổi, mát lạnh / crispy, piping hot, ice-cold) — never bland copy. Return ONLY JSON:
 {"items":[{"id":number,"pitch_vn":string,"pitch_en":string}]}`;
   // gpt-oss on Workers AI speaks the Responses API (`input`), not chat `messages`.
   const result = (await env.AI.run("@cf/openai/gpt-oss-120b" as never, {

@@ -35,7 +35,18 @@ export async function handleAdmin(
       scenario?: Record<string, unknown> | null;
       inventory_preset?: "zinger_out" | "dessert_over" | "reset";
       store_id?: number;
+      promo_code?: string | null;  // scenario-bound promo (e.g. NOEL): on with the scene, off on clear
     };
+    if (body.promo_code !== undefined) {
+      const prev = (await getSettings(env)).scenario_promo as string | null | undefined;
+      if (prev) await env.DB.prepare("UPDATE promotions SET active=0 WHERE code=?").bind(prev).run();
+      if (body.promo_code) {
+        await env.DB.prepare("UPDATE promotions SET active=1 WHERE code=?").bind(body.promo_code).run();
+        tel.emit("config_change", "admin", "d1", `🎬 scenario promo on: ${body.promo_code}`);
+      }
+      await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('scenario_promo',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+        .bind(JSON.stringify(body.promo_code ?? null)).run();
+    }
     if (body.scenario !== undefined) {
       await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('scenario',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
         .bind(JSON.stringify(body.scenario)).run();
@@ -47,7 +58,7 @@ export async function handleAdmin(
       const storeId = body.store_id ?? (body.scenario as { store_id?: number })?.store_id ?? 1;
       if (body.inventory_preset === "zinger_out") {
         await env.DB.prepare(
-          "UPDATE store_inventory SET stock=0 WHERE store_id=? AND item_id IN (SELECT id FROM menu_items WHERE keywords LIKE '%burger zinger%' AND is_combo=0)",
+          "UPDATE store_inventory SET stock=0 WHERE store_id=? AND item_id IN (SELECT id FROM menu_items WHERE keywords LIKE '%burger%' AND keywords LIKE '%zinger%' AND is_combo=0)",
         ).bind(storeId).run();
       } else if (body.inventory_preset === "dessert_over") {
         await env.DB.prepare(

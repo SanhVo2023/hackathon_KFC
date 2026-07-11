@@ -1,6 +1,7 @@
-// Generates missing menu-item product photos with Gemini image generation.
+// Generates missing product photos + attract-screen heroes with Gemini.
 // Usage:  GEMINI_API_KEY=... node seed/gen-images.mjs
-// Writes public/img/item-<id>.jpg; generate.mjs + a D1 UPDATE pick them up.
+// Writes public/img/gen-<name-slug>.jpg (products) and hero-*.jpg (attract).
+// Filenames are NAME SLUGS, not catalog ids — ids shift when the crawl grows.
 // The API key is passed via env only — never committed.
 
 import { writeFileSync, existsSync, mkdirSync } from "node:fs";
@@ -14,17 +15,18 @@ mkdirSync(outDir, { recursive: true });
 const KEY = process.env.GEMINI_API_KEY;
 if (!KEY) { console.error("GEMINI_API_KEY env var required"); process.exit(1); }
 
-const ITEMS = [
-  { id: 25, prompt: "3 crispy golden fried chicken tenders" },
-  { id: 26, prompt: "6 spicy crispy fried chicken hot wings" },
-  { id: 31, prompt: "teriyaki glazed chicken fillet on white rice in a bowl" },
-  { id: 33, prompt: "hot chicken and sweet corn soup in a small paper cup" },
-  { id: 38, prompt: "orange Mirinda soft drink in a branded-free paper cup with ice" },
-  { id: 39, prompt: "iced lemon tea with chia seeds in a clear plastic cup" },
-  { id: 41, prompt: "a 500ml bottle of still water, plain label" },
-  { id: 42, prompt: "strawberry sundae soft-serve ice cream in a cup with strawberry syrup" },
-  { id: 45, prompt: "combo meal: crispy chicken burger, box of french fries and a cola paper cup" },
-  { id: 47, prompt: "family feast: red-and-white striped bucket of 8 fried chicken pieces with 2 large fries, coleslaw salad and 4 cola cups" },
+const MENU_STYLE = (p) =>
+  `Professional studio product photography for a fast-food menu board: ${p}. Centered composition on a PURE WHITE background, appetizing, natural warm lighting, photorealistic, no text, no watermark, no logo, no people, square format.`;
+const HERO_STYLE = (p) =>
+  `Dramatic appetizing hero photograph for a fried-chicken restaurant kiosk idle screen: ${p}. Cinematic warm lighting, shallow depth of field, photorealistic, rich deep-red backdrop, no text, no watermark, no logo, no people, PORTRAIT (vertical 3:4) composition.`;
+
+const TASKS = [
+  // product shots that survive reseeds (existing gen-*.jpg are skipped)
+  { file: "gen-combo-ga-quay-giang-sinh.jpg", prompt: MENU_STYLE("Christmas special combo: a whole golden honey-pepper glazed roast chicken with two boxes of french fries and two cola paper cups, garnished with small pine sprigs and a thin red ribbon for a subtle festive touch") },
+  { file: "gen-party-bucket-noel.jpg", prompt: MENU_STYLE("Christmas party feast: a plain red-and-white striped bucket with 10 crispy fried chicken pieces, two large boxes of french fries, a coleslaw cup, four cola paper cups and two strawberry sundae cups, subtle festive pine-and-ribbon styling") },
+  // attract-screen heroes
+  { file: "hero-attract.jpg", prompt: HERO_STYLE("a plain red-and-white striped bucket overflowing with crispy golden fried chicken pieces, gentle steam rising, a few golden crumbs mid-air") },
+  { file: "hero-xmas.jpg", prompt: HERO_STYLE("a plain red-and-white striped bucket overflowing with crispy golden fried chicken, surrounded by pine branches and softly glowing warm fairy-light bokeh, a quiet Christmas evening mood") },
 ];
 
 const MODELS = [
@@ -35,7 +37,7 @@ const MODELS = [
 
 async function generate(model, prompt) {
   const body = {
-    contents: [{ parts: [{ text: `Professional studio product photography for a fast-food menu board: ${prompt}. Centered composition on a PURE WHITE background, appetizing, natural warm lighting, photorealistic, no text, no watermark, no logo, no people, square format.` }] }],
+    contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
   };
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${KEY}`, {
@@ -52,24 +54,23 @@ async function generate(model, prompt) {
 }
 
 let model = null;
-const done = [];
-for (const item of ITEMS) {
-  const out = join(outDir, `item-${item.id}.jpg`);
-  if (existsSync(out)) { console.log(`item-${item.id} exists, skip`); done.push(item.id); continue; }
+let done = 0;
+for (const task of TASKS) {
+  const out = join(outDir, task.file);
+  if (existsSync(out)) { console.log(`${task.file} exists, skip`); done++; continue; }
   let ok = false;
   for (const m of model ? [model] : MODELS) {
     try {
-      const buf = await generate(m, item.prompt);
+      const buf = await generate(m, task.prompt);
       writeFileSync(out, buf);
-      console.log(`✓ item-${item.id}.jpg (${(buf.length / 1024).toFixed(0)}KB) via ${m}`);
-      model = m; ok = true; done.push(item.id);
+      console.log(`✓ ${task.file} (${(buf.length / 1024).toFixed(0)}KB) via ${m}`);
+      model = m; ok = true; done++;
       break;
     } catch (err) {
       console.log(`  ${String(err).slice(0, 140)}`);
     }
   }
-  if (!ok) console.log(`✗ item-${item.id} failed on all models`);
+  if (!ok) console.log(`✗ ${task.file} failed on all models`);
   await new Promise((r) => setTimeout(r, 1200)); // gentle rate limit
 }
-console.log(`\ngenerated/present: ${done.length}/${ITEMS.length}`);
-console.log("SQL to apply:\n" + done.map((id) => `UPDATE menu_items SET image_url='/img/item-${id}.jpg' WHERE id=${id};`).join("\n"));
+console.log(`\npresent: ${done}/${TASKS.length} — rerun seed/generate.mjs + reseed to attach product shots`);

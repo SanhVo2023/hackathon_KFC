@@ -210,6 +210,33 @@
 
 /* camera frame injection control */
 .pt-right { display: flex; align-items: center; gap: .8vw; }
+/* live "what the AI would recommend right now" strip */
+.pf-recs { border-top: 1px solid var(--ops-line); padding: .5vw 1vw .7vw; }
+.pf-recs-title { font-size: .62vw; letter-spacing: .12em; color: var(--ai-gold); font-weight: 800; margin-bottom: .45vw; display: flex; align-items: baseline; gap: .6vw; }
+.pf-recs-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6vw; }
+.pfr-card {
+  position: relative; display: flex; gap: .55vw; align-items: center;
+  background: var(--ops-panel-2); border: 1px solid var(--ops-line);
+  border-radius: .55vw; padding: .45vw .55vw; min-width: 0;
+  animation: pfrIn .35s ease both;
+}
+@keyframes pfrIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.pfr-card img, .pfr-ph {
+  width: 3vw; height: 3vw; border-radius: .45vw; object-fit: cover; flex: 0 0 3vw;
+  background: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.4vw;
+}
+.pfr-body { min-width: 0; display: flex; flex-direction: column; gap: .12vw; }
+.pfr-body b { font-size: .72vw; color: var(--ops-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pfr-price { font-size: .66vw; color: var(--ai-gold); font-weight: 800; }
+.pfr-pitch { font-size: .58vw; color: var(--ops-dim); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pfr-chip {
+  position: absolute; top: -.45vw; right: .4vw;
+  background: #1B2130; border: 1px solid var(--ai-gold); color: var(--ai-gold);
+  border-radius: 99px; padding: .08vw .45vw; font-size: .55vw; font-weight: 800; white-space: nowrap;
+}
+.pfr-chip[data-s="cross_subsidy"] { border-color: #3FB68B; color: #3FB68B; }
+.pfr-chip[data-s="persona_match"] { border-color: #7AA7FF; color: #7AA7FF; }
+
 .pf-inject {
   background: var(--ops-panel-2); border: 1px solid var(--ai-gold); color: var(--ai-gold);
   border-radius: 99px; padding: .18vw .7vw; font-size: .66vw; font-weight: 700;

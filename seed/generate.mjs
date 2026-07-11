@@ -32,21 +32,29 @@ function fold(s) {
 const esc = (s) => (s == null ? "NULL" : `'${String(s).replace(/'/g, "''")}'`);
 
 // ---------- 1. load crawl ----------
-function loadCrawl() {
-  const p = join(here, "crawl-menu.json");
+function parseCrawlFile(p) {
   if (!existsSync(p)) return [];
   let raw = readFileSync(p, "utf8");
   // repair double-encoded UTF-8 if the console mangled it (Ã + continuation pattern)
   if ((raw.match(/Ã[-¿ -ÿ]/g) || []).length > 20) {
     raw = Buffer.from(raw, "latin1").toString("utf8");
   }
-  const line = raw.split(/\r?\n/).find((l) => l.trim().startsWith('{"status"'));
+  const line = raw.split(/\r?\n/).find((l) => l.trim().startsWith("{") && l.includes('"status"'));
   if (!line) return [];
   try {
     const parsed = JSON.parse(line);
     if (parsed.status !== "COMPLETED") return [];
     return parsed.result?.items ?? [];
   } catch { return []; }
+}
+// crawl-full-raw.json = the complete-menu TinyFish run (~92 items, all 8 site
+// categories); crawl-menu.json = the older partial run kept as fallback.
+function loadCrawl() {
+  for (const file of ["crawl-full-raw.json", "crawl-menu.json"]) {
+    const items = parseCrawlFile(join(here, file));
+    if (items.length) { console.log(`crawl source: ${file}`); return items; }
+  }
+  return [];
 }
 
 const CAT_MAP = [
@@ -110,6 +118,9 @@ const CURATED = [
   { name: "Combo 2 Miếng Gà", name_en: "2 pc Chicken Combo", category: "combo", price: 89000, description: "2 Miếng gà + 1 Khoai tây chiên (Vừa) + 1 Pepsi (Vừa)", tags: ["lunch", "dinner"], pop: 0.85, margin: 30 },
   { name: "Xô Gia Đình 329K", name_en: "Family Bucket 329K", category: "combo", price: 329000, description: "8 Miếng gà + 2 Khoai lớn + 1 Salad + 4 Pepsi", tags: ["dinner", "sharing"], pop: 0.75, margin: 28 },
   { name: "Combo Ăn Xế 45K", name_en: "Tea Break Combo 45K", category: "combo", price: 45000, description: "1 Gà Popcorn (Vừa) + 1 Pepsi (Vừa)", tags: ["tea", "late"], pop: 0.55, margin: 35 },
+  // Christmas specials — seasonal items that never appear on the crawled menu
+  { name: "Combo Gà Quay Giáng Sinh", name_en: "Christmas Roast Chicken Combo", category: "combo", price: 199000, description: "1 Gà quay tiêu mật ong + 2 Khoai tây chiên (Vừa) + 2 Pepsi (Vừa) — phiên bản Noel ấm áp", tags: ["dinner", "sharing", "xmas"], pop: 0.7, margin: 31 },
+  { name: "Party Bucket Noel", name_en: "Christmas Party Bucket", category: "combo", price: 399000, description: "10 Miếng gà rán + 2 Khoai tây chiên (Lớn) + 1 Salad bắp cải + 4 Pepsi + 2 Kem Sundae Dâu — tiệc Giáng Sinh cho cả nhà", tags: ["dinner", "sharing", "xmas"], pop: 0.65, margin: 29 },
 ];
 
 // ---------- build merged catalog ----------
@@ -136,9 +147,20 @@ for (const it of crawlItems) {
     source: "tinyfish-crawl",
   });
 }
+// with the FULL crawl on board, these curated stand-ins duplicate real menu
+// items under slightly different names — drop them to keep the menu authentic
+const SUPERSEDED = new Set([
+  "burger zinger",        // crawl: burger ga zinger
+  "ga popcorn (vua)",     // crawl: ga vien popcorn (vua)
+  "3 ga mieng tenders",   // crawl: 3 mieng ga ran tender
+  "salad bap cai",        // crawl: 1 bap cai tron (vua)
+  "pho mai que (3)",      // crawl: 4 pho mai vien
+  "combo zinger solo",    // crawl: combo burger zinger
+]);
+const fullCrawl = crawlItems.length > 50;
 for (const it of CURATED) {
   const key = fold(it.name);
-  if (seen.has(key)) continue;
+  if (seen.has(key) || (fullCrawl && SUPERSEDED.has(key))) continue;
   seen.add(key);
   catalog.push({
     id: nextId++, name: it.name, name_en: it.name_en, category: it.category,
@@ -169,7 +191,7 @@ function loadImageCrawl() {
   if (!existsSync(p)) return [];
   let raw = readFileSync(p, "utf8");
   if ((raw.match(/Ã[-¿ -ÿ]/g) || []).length > 20) raw = Buffer.from(raw, "latin1").toString("utf8");
-  const line = raw.split(/\r?\n/).find((l) => l.trim().startsWith('{"status"'));
+  const line = raw.split(/\r?\n/).find((l) => l.trim().startsWith("{") && l.includes('"status"'));
   if (!line) return [];
   try {
     const parsed = JSON.parse(line);
@@ -185,11 +207,13 @@ for (const item of catalog) {
     key.split(" ").filter((w) => w.length > 3).every((w) => m.key.includes(w)));
   if (hit) { item.image_url = hit.url; filled++; }
 }
-// Gemini-generated product shots (seed/gen-images.mjs) fill the last gaps
+// Gemini-generated product shots (seed/gen-images.mjs) fill the last gaps.
+// Keyed by NAME SLUG, not catalog id — ids shift whenever the crawl grows.
+const slug = (name) => fold(name).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
 let genFilled = 0;
 for (const item of catalog) {
-  if (!item.image_url && existsSync(join(here, "..", "public", "img", `item-${item.id}.jpg`))) {
-    item.image_url = `/img/item-${item.id}.jpg`;
+  if (!item.image_url && existsSync(join(here, "..", "public", "img", `gen-${slug(item.name)}.jpg`))) {
+    item.image_url = `/img/gen-${slug(item.name)}.jpg`;
     genFilled++;
   }
 }
@@ -221,6 +245,8 @@ const PROMOS = [
   { code: "CUOITUAN", name: "Cuối Tuần Xô Vui", description: "Giảm 15% các món xô/combo nhóm Thứ 7 & CN", kind: "percent", value: 15, scope_category: "combo", days_of_week: "0,6", min_order: 150000 },
   { code: "DEMMUON", name: "Đêm Muộn Freeship Vị Giác", description: "Giảm 10.000₫ đơn sau 21h", kind: "amount", value: 10000, daypart: "late", min_order: 60000 },
   { code: "SINHNHAT50", name: "KFC 50 Năm -50K", description: "Giảm 50.000₫ cho đơn từ 300.000₫ - mừng sinh nhật KFC", kind: "amount", value: 50000, min_order: 300000 },
+  // scenario-bound: seeded OFF, the Đêm Giáng Sinh scenario switches it on
+  { code: "NOEL", name: "Ưu đãi Giáng Sinh -15%", description: "Giảm 15% các combo Noel & xô nhóm trong mùa Giáng Sinh", kind: "percent", value: 15, scope_category: "combo", min_order: 150000, active: 0 },
 ];
 
 // ---------- 4. affinities ----------
@@ -275,6 +301,8 @@ const HOLIDAYS = [
   ["2026-07-27", "Ngày Thương binh Liệt sĩ (weekend-level traffic)"],
   ["2026-09-02", "Quốc khánh 2/9"],
   ["2026-09-03", "Nghỉ lễ Quốc khánh"],
+  ["2026-12-24", "Đêm Giáng Sinh"],
+  ["2026-12-25", "Giáng Sinh"],
 ];
 
 // ---------- 5. synthetic POS history -> co-occurrence pairs ----------
@@ -369,11 +397,11 @@ for (const store of STORES) {
   }
 }
 // narrative cases for the demo
-const zinger = catalog.find((i) => fold(i.name).includes("burger zinger") && !i.is_combo);
+const zingerIds = new Set(catalog.filter((i) => /burger/.test(fold(i.name)) && /zinger/.test(fold(i.name)) && !i.is_combo).map((i) => i.id));
 const eggTart = catalog.find((i) => fold(i.name).includes("banh trung"));
 const pepsiCan = catalog.find((i) => fold(i.name).includes("pepsi (lon)"));
 for (const inv of inventory) {
-  if (zinger && inv.store_id === 2 && inv.item_id === zinger.id) { inv.stock = 0; }            // mall store 86'd Zinger
+  if (inv.store_id === 2 && zingerIds.has(inv.item_id)) { inv.stock = 0; }                     // mall store 86'd Zinger
   if (eggTart && inv.store_id === 1 && inv.item_id === eggTart.id) { inv.stock = inv.par * 3; } // overstock: push egg tarts
   if (pepsiCan && inv.store_id === 3 && inv.item_id === pepsiCan.id) { inv.stock = 4; }         // office store nearly out
 }
@@ -477,7 +505,7 @@ for (const i of catalog) {
 for (const p of PROMOS) {
   lines.push(
     `INSERT INTO promotions (code,name,description,kind,value,item_id,scope_category,daypart,days_of_week,min_order,active) VALUES (` +
-    `${esc(p.code)},${esc(p.name)},${esc(p.description)},${esc(p.kind)},${p.value},NULL,${esc(p.scope_category)},${esc(p.daypart)},${esc(p.days_of_week)},${p.min_order},1);`,
+    `${esc(p.code)},${esc(p.name)},${esc(p.description)},${esc(p.kind)},${p.value},NULL,${esc(p.scope_category)},${esc(p.daypart)},${esc(p.days_of_week)},${p.min_order},${p.active ?? 1});`,
   );
 }
 for (const [a, b, w, r] of AFFINITIES) {

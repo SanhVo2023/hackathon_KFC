@@ -73,6 +73,10 @@
   };
   let W = null; // wizard state
 
+  // same-origin ops view reads the live cart to probe "what would the AI
+  // recommend this customer right now" (never shown on the kiosk itself)
+  KFC.cartLines = () => S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty }));
+
   const t = (k, ...a) => { const v = L[S.lang][k]; return typeof v === "function" ? v(...a) : v; };
   const itemName = (m) => (S.lang === "en" && m.name_en ? m.name_en : m.name);
   const fold = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
@@ -116,6 +120,8 @@
     S.store = data.store;
     S.festive = data.festive;
     S.holiday = data.holiday;
+    // seasonal skin — same journey, festive dress (like real stores in December)
+    document.body.classList.toggle("xmas", /giáng sinh|noel|christmas/i.test(S.holiday ?? ""));
     if (data.store) $("#kh-store").textContent = data.store.name;
     S.byCat = {};
     for (const m of S.menu) (S.byCat[m.category] ??= []).push(m);
@@ -124,9 +130,25 @@
     const promoData = await api("/api/promotions");
     S.promos = promoData.promotions;
     renderContextStrip();
+    renderAttractTicker();
     renderMenuRail();
     renderGrid();
     renderBottomBar();
+  }
+
+  // rotating promo line on the idle screen (real kiosks tease hot deals)
+  let tickerTimer = null;
+  function renderAttractTicker() {
+    const el = $("#attract-ticker");
+    if (!el) return;
+    clearInterval(tickerTimer);
+    const lines = S.promos.map((p) => `🔥 ${p.name} — ${p.description}`);
+    if (S.holiday) lines.unshift(`🎄 ${S.holiday}: ${S.lang === "vi" ? "combo Noel đang chờ bạn!" : "Christmas combos are here!"}`);
+    if (!lines.length) { el.innerHTML = ""; return; }
+    let i = 0;
+    const showLine = () => { el.innerHTML = `<span>${lines[i % lines.length]}</span>`; i++; };
+    showLine();
+    tickerTimer = setInterval(showLine, 3800);
   }
 
   function renderContextStrip() {
@@ -183,8 +205,12 @@
       { name: "Không, cảm ơn", name_en: "No, thanks", delta: 0 },
       { name: "Thêm Phô Mai", name_en: "Extra Cheese", delta: 10000 },
       { name: "Sốt Colonel", name_en: "Colonel Sauce", delta: 10000 }] },
+    // 3 tiers, decoy in the middle: Lớn exists to make Đại (+2k more for a lot
+    // more food) feel like the obviously smart choice — asymmetric dominance.
     { key: "upsize", name: "UPSIZE KHOAI TÂY", name_en: "UPSIZE CHIPS", options: [
-      { name: "Khoai Vừa", name_en: "Regular chips", delta: 0 }, { name: "Khoai Lớn", name_en: "Large chips", delta: 12000 }] },
+      { name: "Khoai Vừa", name_en: "Regular chips", delta: 0 },
+      { name: "Khoai Lớn", name_en: "Large chips", delta: 10000, decoy: true },
+      { name: "Khoai Đại", name_en: "Jumbo chips", delta: 12000, target: true }] },
   ];
 
   function modGroups(item) {
@@ -638,7 +664,15 @@
       renderWizard();
     }
     else if (btn.dataset.g !== undefined && S.screen === "wizard") {
-      W.mods[Number(btn.dataset.g)] = Number(btn.dataset.o);
+      const gi = Number(btn.dataset.g), oi = Number(btn.dataset.o);
+      W.mods[gi] = oi;
+      const opt = modGroups(W.chosen)[gi]?.options?.[oi];
+      if (opt?.target) {
+        postEvent("strategy", `decoy landed: ${opt.name} chosen (+${fmtVND(opt.delta)}) — asymmetric dominance`);
+        observe(`upsized to ${opt.name} (jumbo tier over the decoy middle)`);
+      } else if (opt?.decoy) {
+        postEvent("tap", `decoy tier picked (${opt.name}) — rare, the middle exists to sell Đại`);
+      }
       renderWizard();
     }
     else if (btn.dataset.step && btn.closest(".addon-card")) {

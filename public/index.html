@@ -20,29 +20,12 @@
     </nav>
   </header>
 
-  <!-- scenario director drawer -->
+  <!-- scenario director drawer — 3 iconic situations, one tap each -->
   <aside class="scenario-drawer" id="scenario-drawer" hidden>
     <div class="sd-head">🎬 SCENARIO DIRECTOR <button id="scenario-close">✕</button></div>
-    <p class="sd-hint">Dàn dựng bối cảnh demo — kiosk, engine và banner đều đi theo kịch bản.</p>
+    <p class="sd-hint">Ba tình huống kinh điển — một chạm, kiosk + engine + tồn kho + khuyến mãi đổi theo.</p>
     <div class="sd-presets" id="sd-presets"></div>
-    <div class="sd-custom">
-      <div class="sd-row"><label>Cửa hàng</label><select id="sd-store"></select></div>
-      <div class="sd-row"><label>Khung giờ</label><select id="sd-daypart"></select></div>
-      <div class="sd-row"><label>Thứ</label><select id="sd-dow">
-        <option value="1">Thứ 2</option><option value="2">Thứ 3</option><option value="3">Thứ 4</option>
-        <option value="4">Thứ 5</option><option value="5">Thứ 6</option><option value="6">Thứ 7</option><option value="0">Chủ nhật</option>
-      </select></div>
-      <div class="sd-row"><label>Ngày lễ</label><label class="sd-check"><input type="checkbox" id="sd-holiday" /> Kích hoạt chế độ lễ/tết</label></div>
-      <div class="sd-row"><label>Tồn kho</label>
-        <div class="sd-inv">
-          <button data-inv="zinger_out">Zinger hết hàng</button>
-          <button data-inv="dessert_over">Dư tráng miệng</button>
-          <button data-inv="reset">Về định mức</button>
-        </div>
-      </div>
-      <button class="sd-apply" id="sd-apply">Áp dụng kịch bản</button>
-      <button class="sd-clear" id="sd-clear">↺ Về thời gian thực</button>
-    </div>
+    <button class="sd-clear" id="sd-clear">↺ Về thời gian thực</button>
   </aside>
 
   <main class="dt-main">
@@ -67,6 +50,10 @@
         </div>
         <div class="profile-body" id="profile-body">
           <p class="profile-empty">Chưa có khách — chạm “Bắt đầu” trên kiosk và check-in camera.</p>
+        </div>
+        <div class="pf-recs" id="pf-recs" hidden>
+          <div class="pf-recs-title">🍽 MÓN AI SẼ GỢI Ý NGAY LÚC NÀY <span class="pt-hint">cập nhật theo từng chạm &amp; giả thuyết khách</span></div>
+          <div class="pf-recs-row" id="pf-recs-row"></div>
         </div>
       </div>
       <div class="dt-log-panel">

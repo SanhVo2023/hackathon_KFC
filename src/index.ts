@@ -124,13 +124,14 @@ async function handlePublic(
       store_id?: number; daypart?: string;
     };
     const sim = body.trigger === "simulator";
-    tel.emit("api_call", sim ? "admin" : "kiosk", "worker", `POST /api/recommend (${body.trigger ?? "cart"}, ${body.cart?.length ?? 0} lines)`);
-    tel.emit("rec_request", "worker", "rec", `trigger: ${body.trigger ?? "cart_review"}${sim ? ` [what-if: store ${body.store_id}, ${body.daypart}]` : ""}`);
+    const probe = body.trigger === "ops_panel";   // hypothesis-panel "what would the AI suggest right now"
+    tel.emit("api_call", sim || probe ? "admin" : "kiosk", "worker", `POST /api/recommend (${body.trigger ?? "cart"}, ${body.cart?.length ?? 0} lines)`);
+    tel.emit("rec_request", probe ? "profiler" : "worker", "rec", probe ? "ops probe: what would the AI suggest this customer right now?" : `trigger: ${body.trigger ?? "cart_review"}${sim ? ` [what-if: store ${body.store_id}, ${body.daypart}]` : ""}`);
     const t0 = Date.now();
     const result = await recommend(env, tel, body.cart ?? [], body.trigger ?? "cart_review", body.session_id ?? "anon", {
       store_id: body.store_id, daypart: body.daypart as never,
     });
-    tel.emit("rec_response", "rec", sim ? "admin" : "kiosk", `${result.items.length} picks in ${Date.now() - t0}ms (${result.store.cluster}/${result.daypart})`, undefined, Date.now() - t0);
+    tel.emit("rec_response", "rec", sim || probe ? "admin" : "kiosk", `${result.items.length} picks in ${Date.now() - t0}ms (${result.store.cluster}/${result.daypart})${probe ? ` [${result.items.map((i) => i.strategy).join(", ")}]` : ""}`, undefined, Date.now() - t0);
     return json(result);
   }
 
