@@ -102,6 +102,115 @@
   }
   $$(".nav-item").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
 
+  /* ================= 0 · stores (this admin's + kiosk's store context) ================= */
+
+  let stores = [];
+  let currentStore = 1;
+
+  const loadStores = async () => {
+    const r = await call("/api/admin/stores");
+    stores = r.stores || [];
+    currentStore = Number(r.current_store) || 1;
+    const sel = $("#storeSelect");
+    sel.innerHTML = stores.map((s) =>
+      `<option value="${s.id}" ${s.id === currentStore ? "selected" : ""}>${esc(s.name)} · ${esc(s.district ?? "")}</option>`).join("");
+    const sim = $("#simStore");
+    if (sim && !sim.children.length) {
+      sim.innerHTML = stores.map((s) => `<option value="${s.id}">${esc(s.name)} (${esc(s.cluster)})</option>`).join("");
+    }
+  };
+
+  $("#storeSelect").addEventListener("change", async (e) => {
+    const id = Number(e.target.value);
+    try {
+      await call("/api/admin/settings", { method: "PUT", body: { current_store: id } });
+      currentStore = id;
+      const s = stores.find((x) => x.id === id);
+      toast(`Kiosk & AI chuyển sang ${s ? s.name : "cửa hàng #" + id}`);
+      cache.menu = null; cache.metrics = null; cache.forecast = null;
+      guard(loadMenu)(); guard(loadForecast)();
+    } catch (_) { /* toast shown */ }
+  });
+
+  /* ================= 0b · forecast ================= */
+
+  const loadForecast = async () => {
+    if (activeTab !== "overview") return;
+    const r = await call("/api/admin/forecast");
+    const key = JSON.stringify(r);
+    if (key === cache.forecast) return;
+    cache.forecast = key;
+    const dps = r.demand_by_daypart || [];
+    const maxD = Math.max(...dps.map((d) => d.orders_per_day), 1);
+    const dpOrder = ["breakfast", "lunch", "tea", "dinner", "late"];
+    dps.sort((a, b) => dpOrder.indexOf(a.daypart) - dpOrder.indexOf(b.daypart));
+    const stockouts = (r.projected_stockouts || []).filter((s) => s.days_left < 7);
+    const over = r.overstock_to_push || [];
+    $("#ovForecast").innerHTML = `
+      <div class="fc-col">
+        <h4>Nhu cầu theo khung giờ <small>đơn/ngày</small></h4>
+        ${dps.map((d) => {
+          const meta = DAYPART_META[d.daypart] || { vi: d.daypart, icon: "" };
+          return `<div class="brow"><span class="fc-dp">${meta.icon} ${esc(meta.vi)}</span>
+            <div class="meter"><i style="width:${(d.orders_per_day / maxD) * 100}%"></i></div>
+            <span class="br-val mono">${d.orders_per_day}</span></div>`;
+        }).join("")}
+      </div>
+      <div class="fc-col">
+        <h4>⚠️ Sắp hết hàng <small>theo tốc độ bán</small></h4>
+        ${stockouts.length ? stockouts.slice(0, 5).map((s) => `
+          <div class="brow"><span class="fc-name">${esc(s.name)}</span>
+            <span class="badge ${s.days_left < 1.5 ? "err" : "warn"}">còn ${s.stock} · ~${s.days_left} ngày</span></div>`).join("")
+          : `<p class="empty">Không có món nào sắp hết 🎉</p>`}
+      </div>
+      <div class="fc-col">
+        <h4>📦 Dư hàng — AI sẽ ưu tiên đẩy</h4>
+        ${over.length ? over.map((s) => `
+          <div class="brow"><span class="fc-name">${esc(s.name)}</span>
+            <span class="badge ok">+${s.excess_pct}% so với định mức</span></div>`).join("")
+          : `<p class="empty">Tồn kho đang cân bằng.</p>`}
+      </div>`;
+  };
+
+  /* ================= 0c · what-if simulator ================= */
+
+  function initSimSelectors() {
+    const dp = $("#simDaypart");
+    if (dp && !dp.children.length) {
+      dp.innerHTML = Object.entries(DAYPART_META).map(([k, v]) => `<option value="${k}">${v.icon} ${esc(v.vi)}</option>`).join("");
+      dp.value = "lunch";
+    }
+    const an = $("#simAnchor");
+    if (an && menuItems.length && !an.children.length) {
+      const mains = menuItems.filter((m) => ["combo", "chicken", "burger-rice"].includes(m.category));
+      an.innerHTML = mains.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join("");
+    }
+  }
+
+  $("#simRun").addEventListener("click", guard(async () => {
+    const box = $("#simResults");
+    box.innerHTML = `<p class="empty">AI đang chấm điểm…</p>`;
+    const r = await call("/api/recommend", {
+      method: "POST",
+      body: {
+        session_id: "admin-sim", trigger: "simulator",
+        store_id: Number($("#simStore").value), daypart: $("#simDaypart").value,
+        cart: [{ item_id: Number($("#simAnchor").value), qty: 1 }],
+      },
+    });
+    const items = r.items || [];
+    box.innerHTML = `
+      <div class="sim-ctx">Bối cảnh: <b>${esc(r.store?.name ?? "")}</b> (${esc(r.store?.cluster ?? "")}) · ${esc(DAYPART_META[r.daypart]?.vi ?? r.daypart)}${r.festive ? " · 🎉 cuối tuần/lễ" : ""}</div>
+      ${items.length ? items.map((it) => `
+        <div class="sim-card">
+          <div class="sim-name">${esc(it.name)} <span class="sim-price mono">${esc(it.price_display)}</span></div>
+          <div class="sim-pitch">“${esc(it.pitch_vn)}”</div>
+          <div class="sim-breakdown">${Object.entries(it.breakdown).map(([k, v]) => `
+            <span class="sim-sig" title="${esc(k)}">${esc((SIGNAL_META[k]?.vi ?? k).split(" ")[0])} <i style="width:${Math.min(100, v * 300)}%"></i><b>${v.toFixed(2)}</b></span>`).join("")}
+          </div>
+        </div>`).join("") : `<p class="empty">Không có gợi ý cho bối cảnh này.</p>`}`;
+  }));
+
   /* ================= 1 · overview ================= */
 
   const loadMetrics = async () => {
@@ -474,6 +583,7 @@
     affinity:     { vi: "Luật món hợp nhau",     en: "Affinity rules", desc: "Cặp món hợp vị do đội ngũ định sẵn — ví dụ gà rán luôn đi cùng nước ngọt." },
     daypart:      { vi: "Khung giờ trong ngày",  en: "Daypart", desc: "Ưu tiên món phù hợp với buổi sáng, trưa, xế hay tối." },
     promo:        { vi: "Khuyến mãi đang chạy",  en: "Promotions", desc: "Ưu tiên gợi ý các món đang có chương trình giảm giá." },
+    inventory:    { vi: "Tồn kho cửa hàng",      en: "Inventory posture", desc: "Đẩy món đang dư hàng, tự bảo vệ món sắp hết — không bao giờ gợi ý món đã hết." },
     margin:       { vi: "Biên lợi nhuận",        en: "Margin", desc: "Ưu tiên nhẹ những món mang lại lợi nhuận tốt hơn cho cửa hàng." },
     popularity:   { vi: "Độ phổ biến",           en: "Popularity", desc: "Ưu tiên những món bán chạy nhất tại cửa hàng." },
   };
@@ -597,6 +707,7 @@
     cache.menu = key;
     menuItems = items;
     renderMenu();
+    initSimSelectors();
   };
 
   function renderMenu() {
@@ -620,17 +731,24 @@
     $("#menuGroups").innerHTML = cats.length ? cats.map((c) => {
       const meta = CAT_META[c] || { vi: c, en: "", icon: "🍽️" };
       const rows = groups.get(c).map((it) => {
-        const on = !!Number(it.available);
+        const on = !!Number(it.available) && !!Number(it.store_available ?? 1) && Number(it.stock ?? 99) > 0;
         const rawPop = Number(it.popularity) || 0;
         const pop = Math.min(100, rawPop <= 1 ? rawPop * 100 : rawPop);
+        const stock = it.stock;
+        const low = stock != null && it.par_level != null && stock <= Math.max(5, it.par_level * 0.2);
+        const over = stock != null && it.par_level != null && stock > it.par_level * 1.5;
         return `
         <div class="m-row ${on ? "" : "soldout"}">
           <div class="m-name">${esc(it.name)}${it.name_en ? `<small>${esc(it.name_en)}</small>` : ""}</div>
           <div class="m-price">${fmtVND(it.price)}</div>
           <div class="m-pop"><div class="meter ${on ? "ok" : "dim"}"><i style="width:${pop}%"></i></div><span>${Math.round(pop)}</span></div>
+          <div class="m-stock ${low ? "low" : over ? "over" : ""}">
+            ${stock != null ? `<input type="number" min="0" value="${stock}" data-stock="${esc(it.id)}" aria-label="Tồn kho ${esc(it.name)}" />
+            <small>${low ? "sắp hết" : over ? "dư hàng" : "kho"}</small>` : `<small>—</small>`}
+          </div>
           <div class="m-avail">
             <span class="m-state ${on ? "on" : "off"}">${on ? "Còn hàng" : "Hết hàng"}</span>
-            <button class="switch ${on ? "on" : ""}" role="switch" aria-checked="${on}" data-menu="${esc(it.id)}" aria-label="Tình trạng ${esc(it.name)}"></button>
+            <button class="switch ${Number(it.available) ? "on" : ""}" role="switch" aria-checked="${!!Number(it.available)}" data-menu="${esc(it.id)}" aria-label="Tình trạng ${esc(it.name)}"></button>
           </div>
         </div>`;
       }).join("");
@@ -643,6 +761,20 @@
   }
 
   $("#menuSearch").addEventListener("input", renderMenu);
+
+  $("#menuGroups").addEventListener("change", async (e) => {
+    const input = e.target.closest("input[data-stock]");
+    if (!input) return;
+    const it = menuItems.find((x) => String(x.id) === input.dataset.stock);
+    if (!it) return;
+    const stock = Math.max(0, Number(input.value) || 0);
+    it.stock = stock;
+    try {
+      await call(`/api/admin/inventory/${currentStore}/${it.id}`, { method: "PUT", body: { stock } });
+      toast(`Tồn kho “${it.name}” → ${stock}`);
+      cache.menu = null;
+    } catch (_) { /* toast shown */ }
+  });
 
   $("#menuGroups").addEventListener("click", async (e) => {
     const sw = e.target.closest(".switch[data-menu]");
@@ -773,6 +905,8 @@
   /* ================= boot ================= */
 
   addPoller("overview", 5000, loadMetrics);
+  addPoller("overview", 10000, loadForecast);
+  addPoller("*", 30000, loadStores);
   addPoller("orders", 3000, loadOrders);
   addPoller("*", 3000, loadHandoffs);      // global → sidebar alert badge
   addPoller("support", 3000, loadStaff);
@@ -782,5 +916,6 @@
   addPoller("promos", 10000, loadPromos);
   addPoller("log", 2000, loadLog);
 
+  guard(loadMenu)(); // simulator anchors + stock context need the menu early
   setTab("overview");
 })();

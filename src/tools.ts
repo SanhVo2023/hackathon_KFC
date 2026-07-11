@@ -2,7 +2,7 @@
 // Every answer the agent gives is grounded here.
 
 import { recommend, promoApplies, type MenuItem, type CartLine } from "./recs";
-import { Telemetry, vnNow } from "./telemetry";
+import { Telemetry, vnNow, getSettings } from "./telemetry";
 
 export interface UiEffect {
   type: "add_to_cart" | "order_confirmed" | "handoff" | "voucher_applied";
@@ -186,6 +186,13 @@ export async function placeOrder(env: Env, input: PlaceOrderInput) {
     await env.DB.prepare("UPDATE loyalty_members SET points = points + ? WHERE phone = ?")
       .bind(Math.floor(total / 1000), input.loyalty_phone).run();
   }
+
+  // live inventory: decrement stock at this kiosk's store
+  const settings = await getSettings(env);
+  const storeId = Number(settings.current_store ?? 1);
+  await env.DB.batch(input.items.map((it) =>
+    env.DB.prepare("UPDATE store_inventory SET stock = MAX(0, stock - ?) WHERE store_id = ? AND item_id = ?")
+      .bind(it.quantity, storeId, it.item_id)));
 
   const orderNumber = 100 + ((res.meta.last_row_id as number) % 900);
   return {

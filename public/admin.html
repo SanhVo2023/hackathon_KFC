@@ -19,6 +19,10 @@
       </div>
     </div>
     <div class="topbar-right">
+      <div class="store-pick">
+        <span class="store-pick-label">🏪 Cửa hàng</span>
+        <select id="storeSelect" aria-label="Chọn cửa hàng"><option>Đang tải…</option></select>
+      </div>
       <div class="clock">
         <span id="clockTime" class="clock-time">--:--:--</span>
         <span id="clockDate" class="clock-date"></span>
@@ -93,6 +97,10 @@
             <div id="ovTopRecs" class="panel-body"><p class="empty">Đang tải…</p></div>
           </div>
         </div>
+        <div class="panel forecast-panel">
+          <header class="panel-head"><h3>📈 Dự báo cửa hàng <span class="en">Demand & stockout forecast · from 90-day POS history</span></h3></header>
+          <div id="ovForecast" class="panel-body forecast-body"><p class="empty">Đang tải…</p></div>
+        </div>
       </section>
 
       <!-- 2 · Orders -->
@@ -144,6 +152,18 @@
             <p>Bật / tắt các tín hiệu AI dùng để gợi ý món cho khách. Thay đổi có hiệu lực ngay trên kiosk.</p>
           </div>
         </header>
+        <div class="panel sim-panel">
+          <header class="panel-head gold"><h3>🧪 Chạy thử gợi ý <span class="en">What-if simulator — see what any kiosk suggests, anywhere, any time of day</span></h3></header>
+          <div class="panel-body sim-body">
+            <div class="sim-controls">
+              <label>Cửa hàng <select id="simStore"></select></label>
+              <label>Khung giờ <select id="simDaypart"></select></label>
+              <label>Khách vừa chọn <select id="simAnchor"></select></label>
+              <button class="btn btn-red" id="simRun">Chạy thử</button>
+            </div>
+            <div id="simResults" class="sim-results"><p class="empty">Chọn bối cảnh rồi bấm “Chạy thử” — cùng một giỏ hàng, mỗi cửa hàng/khung giờ sẽ gợi ý khác nhau.</p></div>
+          </div>
+        </div>
         <div class="ai-grid">
           <div class="panel ai-panel">
             <header class="panel-head gold"><h3>Tín hiệu gợi ý <span class="en">Signals</span></h3></header>

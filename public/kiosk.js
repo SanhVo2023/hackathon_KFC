@@ -88,6 +88,8 @@
     $("#chat-fab").classList.toggle("hidden", !["menu", "cart", "payment"].includes(screen));
     postEvent("screen_change", `kiosk screen → ${screen}`);
     if (screen === "cart") renderCart();
+    // fresh store/menu context for each new customer (admin may have switched store)
+    if (screen === "attract") loadMenu().catch(() => {});
   }
 
   // ---------- menu ----------
@@ -95,6 +97,10 @@
     const data = await api("/api/menu");
     S.menu = data.items;
     S.daypart = data.daypart;
+    S.store = data.store;
+    S.festive = data.festive;
+    S.holiday = data.holiday;
+    if (data.store) $("#kh-store").textContent = data.store.name;
     S.byCat = {};
     for (const m of S.menu) (S.byCat[m.category] ??= []).push(m);
     S.cats = ["combo", "chicken", "burger-rice", "snack", "drink", "dessert"].filter((c) => S.byCat[c]?.length);
@@ -110,7 +116,8 @@
     const dp = DAYPART_META[S.daypart] ?? {};
     const now = S.promos.filter((p) => p.applies_now);
     const promoTxt = now.length ? ` · ${now[0].name}` : "";
-    $("#daypart-banner").innerHTML = `${dp.icon ?? ""} <b>${S.lang === "vi" ? dp.vi : dp.en}</b>${promoTxt}`;
+    const festiveTxt = S.holiday ? ` · 🎉 ${S.holiday}` : S.festive ? (S.lang === "vi" ? " · 🎉 Cuối tuần" : " · 🎉 Weekend") : "";
+    $("#daypart-banner").innerHTML = `${dp.icon ?? ""} <b>${S.lang === "vi" ? dp.vi : dp.en}</b>${festiveTxt}${promoTxt}`;
   }
 
   function renderCats() {

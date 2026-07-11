@@ -521,3 +521,62 @@ body {
   .support-grid { grid-template-columns: 280px 1fr 250px; gap: 12px; }
   .ai-grid { grid-template-columns: 1.3fr 1fr; }
 }
+
+/* ===== store picker (topbar) ===== */
+.store-pick { display: flex; align-items: center; gap: 8px; margin-right: 18px; }
+.store-pick-label { color: var(--ops-dim); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.store-pick select {
+  background: var(--ops-panel-2); color: var(--ops-text);
+  border: 1px solid var(--ops-line); border-radius: 8px;
+  padding: 7px 10px; font-family: var(--font); font-size: 13px; font-weight: 600;
+  max-width: 300px; cursor: pointer;
+}
+
+/* ===== forecast panel ===== */
+.forecast-panel { margin-top: 18px; }
+.forecast-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.fc-col h4 { font-size: 13px; font-weight: 800; margin-bottom: 10px; color: var(--ops-text); }
+.fc-col h4 small { color: var(--ops-dim); font-weight: 500; }
+.fc-dp { flex: 0 0 110px; font-size: 12.5px; color: var(--ops-dim); }
+.fc-name { flex: 1; font-size: 13px; }
+.badge.err { background: rgba(255,77,94,.14); color: var(--err); }
+@media (max-width: 1500px) { .forecast-body { grid-template-columns: 1fr; } }
+
+/* ===== what-if simulator ===== */
+.sim-panel { margin-bottom: 18px; }
+.sim-controls { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+.sim-controls label { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; font-weight: 700; color: var(--ops-dim); }
+.sim-controls select {
+  background: var(--ops-panel-2); color: var(--ops-text);
+  border: 1px solid var(--ops-line); border-radius: 8px;
+  padding: 8px 10px; font-family: var(--font); font-size: 13px; min-width: 190px;
+}
+.sim-ctx { font-size: 13px; color: var(--ops-dim); margin-bottom: 10px; }
+.sim-ctx b { color: var(--ai-gold); }
+.sim-results { display: flex; flex-direction: column; gap: 10px; }
+.sim-card {
+  background: var(--ops-panel-2); border: 1px solid var(--ops-line);
+  border-left: 3px solid var(--ai-gold); border-radius: 10px; padding: 12px 14px;
+}
+.sim-name { font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; }
+.sim-price { color: var(--ai-gold); }
+.sim-pitch { font-size: 13px; color: var(--ops-dim); font-style: italic; margin: 5px 0 9px; }
+.sim-breakdown { display: flex; gap: 14px; flex-wrap: wrap; }
+.sim-sig { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ops-dim); }
+.sim-sig i { display: block; height: 5px; width: 0; max-width: 46px; min-width: 2px; background: var(--ai-gold); border-radius: 3px; }
+.sim-sig b { font-family: var(--mono); font-size: 10.5px; color: var(--ops-text); }
+
+/* ===== menu stock cell ===== */
+.m-stock { display: flex; align-items: center; gap: 7px; min-width: 110px; }
+.m-stock input {
+  width: 64px; background: var(--ops-panel-2); color: var(--ops-text);
+  border: 1px solid var(--ops-line); border-radius: 7px;
+  padding: 6px 8px; font-family: var(--mono); font-size: 13px; text-align: right;
+}
+.m-stock small { font-size: 10.5px; color: var(--ops-dim); }
+.m-stock.low input { border-color: var(--warn); color: var(--warn); }
+.m-stock.low small { color: var(--warn); font-weight: 700; }
+.m-stock.over input { border-color: var(--ok); }
+.m-stock.over small { color: var(--ok); font-weight: 700; }
+
+.nav-badge[hidden] { display: none !important; }

@@ -5,9 +5,9 @@
 // /api/*       -> kiosk + agent + admin APIs (D1-grounded)
 
 import { runAgent } from "./agent";
-import { recommend, type CartLine } from "./recs";
+import { recommend, getStore, todayHoliday, type CartLine } from "./recs";
 import { placeOrder } from "./tools";
-import { Telemetry, handleTelemetryGet, vnNow } from "./telemetry";
+import { Telemetry, handleTelemetryGet, vnNow, getSettings } from "./telemetry";
 import { handleAdmin } from "./admin";
 
 interface ChatBody {
@@ -66,9 +66,20 @@ async function handlePublic(
   if (path === "/api/menu" && method === "GET") {
     tel.emit("api_call", "kiosk", "worker", "GET /api/menu");
     const t0 = Date.now();
-    const rs = await env.DB.prepare("SELECT * FROM menu_items WHERE available=1 ORDER BY category, price").all();
-    tel.emit("d1_query", "worker", "d1", `menu: ${rs.results.length} items`, undefined, Date.now() - t0);
-    return json({ items: rs.results, ...vnNow() });
+    const settings = await getSettings(env);
+    const storeId = Number(url.searchParams.get("store_id") ?? settings.current_store ?? 1);
+    const [store, holiday] = await Promise.all([getStore(env, storeId), todayHoliday(env)]);
+    // a store's kiosk only sells what that store actually has
+    const rs = await env.DB.prepare(
+      `SELECT m.*, COALESCE(si.stock, 99) AS stock FROM menu_items m
+       LEFT JOIN store_inventory si ON si.item_id = m.id AND si.store_id = ?
+       WHERE m.available = 1 AND COALESCE(si.available, 1) = 1 AND COALESCE(si.stock, 99) > 0
+       ORDER BY m.category, m.price`,
+    ).bind(storeId).all();
+    const now = vnNow();
+    const festive = now.dow === 0 || now.dow === 6 || holiday != null;
+    tel.emit("d1_query", "worker", "d1", `menu @ ${store.name}: ${rs.results.length} items in stock`, undefined, Date.now() - t0);
+    return json({ items: rs.results, store, festive, holiday, ...now });
   }
 
   if (path === "/api/promotions" && method === "GET") {
@@ -82,14 +93,20 @@ async function handlePublic(
     return json({ daypart, promotions: promos });
   }
 
-  // ---------- recommendations (P2 kiosk moments) ----------
+  // ---------- recommendations (P2 kiosk moments + admin simulator) ----------
   if (path === "/api/recommend" && method === "POST") {
-    const body = (await request.json()) as { session_id: string; cart: CartLine[]; trigger?: string };
-    tel.emit("api_call", "kiosk", "worker", `POST /api/recommend (${body.trigger ?? "cart"}, ${body.cart?.length ?? 0} lines)`);
-    tel.emit("rec_request", "worker", "rec", `trigger: ${body.trigger ?? "cart_review"}`);
+    const body = (await request.json()) as {
+      session_id: string; cart: CartLine[]; trigger?: string;
+      store_id?: number; daypart?: string;
+    };
+    const sim = body.trigger === "simulator";
+    tel.emit("api_call", sim ? "admin" : "kiosk", "worker", `POST /api/recommend (${body.trigger ?? "cart"}, ${body.cart?.length ?? 0} lines)`);
+    tel.emit("rec_request", "worker", "rec", `trigger: ${body.trigger ?? "cart_review"}${sim ? ` [what-if: store ${body.store_id}, ${body.daypart}]` : ""}`);
     const t0 = Date.now();
-    const result = await recommend(env, tel, body.cart ?? [], body.trigger ?? "cart_review", body.session_id ?? "anon");
-    tel.emit("rec_response", "rec", "kiosk", `${result.items.length} picks in ${Date.now() - t0}ms`, undefined, Date.now() - t0);
+    const result = await recommend(env, tel, body.cart ?? [], body.trigger ?? "cart_review", body.session_id ?? "anon", {
+      store_id: body.store_id, daypart: body.daypart as never,
+    });
+    tel.emit("rec_response", "rec", sim ? "admin" : "kiosk", `${result.items.length} picks in ${Date.now() - t0}ms (${result.store.cluster}/${result.daypart})`, undefined, Date.now() - t0);
     return json(result);
   }
 

@@ -1,8 +1,10 @@
 // The P2 contextual recommendation engine.
-// Layer 1: deterministic scorer over co-occurrence (synthetic POS history),
-//          affinity rules, daypart fit, promo calendar, margin, popularity.
+// Layer 1: deterministic scorer over 7 signals — co-occurrence (cluster-keyed
+//          POS history), affinity rules, daypart fit (weekend/holiday aware),
+//          promo calendar, store inventory posture, margin, popularity.
 // Layer 2: one LLM call turns the top slate into a bilingual pitch line,
-//          raced against a 1600ms timeout with deterministic fallback copy.
+//          raced against a 1200ms timeout with deterministic fallback copy.
+// Context = store cluster × location × time × day/holiday × inventory × promos × cart.
 
 import { Telemetry, vnNow, getSettings, type Daypart } from "./telemetry";
 
@@ -13,7 +15,13 @@ export interface MenuItem {
   available: number; margin_pct: number; popularity: number;
 }
 
+interface Candidate extends MenuItem {
+  stock: number | null; par_level: number | null; inv_available: number;
+}
+
 export interface CartLine { item_id: number; qty: number; name?: string }
+
+export interface StoreInfo { id: number; name: string; district: string | null; cluster: string }
 
 export interface Recommendation {
   id: number; name: string; name_en: string | null; category: string;
@@ -23,7 +31,10 @@ export interface Recommendation {
   promo_code: string | null; co_pct: number | null;
 }
 
+export interface RecOverrides { store_id?: number; daypart?: Daypart }
+
 const VND = (n: number) => n.toLocaleString("vi-VN") + "₫";
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
 interface Promo {
   id: number; code: string; name: string; description: string; kind: string;
@@ -39,18 +50,36 @@ export function promoApplies(p: Promo, daypart: Daypart, dow: number, subtotal?:
   return true;
 }
 
+export async function getStore(env: Env, storeId: number): Promise<StoreInfo> {
+  const s = await env.DB.prepare("SELECT * FROM stores WHERE id=?").bind(storeId).first<StoreInfo>();
+  return s ?? { id: storeId, name: "KFC Việt Nam", district: null, cluster: "residential" };
+}
+
+export async function todayHoliday(env: Env): Promise<string | null> {
+  const dateStr = vnNow().iso.slice(0, 10);
+  const h = await env.DB.prepare("SELECT name FROM holidays WHERE date=?").bind(dateStr).first<{ name: string }>();
+  return h?.name ?? null;
+}
+
 export async function recommend(
   env: Env,
   tel: Telemetry,
   cart: CartLine[],
   trigger: string,
   sessionId: string,
-): Promise<{ items: Recommendation[]; daypart: Daypart; signals_used: string[] }> {
-  const { daypart, dow } = vnNow();
+  overrides?: RecOverrides,
+): Promise<{ items: Recommendation[]; daypart: Daypart; store: StoreInfo; festive: boolean; holiday: string | null; signals_used: string[] }> {
+  const now = vnNow();
   const settings = await getSettings(env);
+  const daypart = overrides?.daypart ?? now.daypart;
+  const dow = now.dow;
+  const storeId = overrides?.store_id ?? Number(settings.current_store ?? 1);
   const signals = (settings.signals ?? {}) as Record<string, boolean>;
   const baseWeights = (settings.weights ?? {}) as Record<string, number>;
   const slots = Number(settings.rec_slots ?? 3);
+
+  const [store, holiday] = await Promise.all([getStore(env, storeId), todayHoliday(env)]);
+  const festive = dow === 0 || dow === 6 || holiday != null;
 
   // renormalize weights over enabled signals
   const enabled = Object.keys(baseWeights).filter((k) => signals[k] !== false);
@@ -59,22 +88,36 @@ export async function recommend(
 
   const cartIds = cart.map((c) => c.item_id);
   const t0 = Date.now();
-
   const marks = cartIds.map(() => "?").join(",") || "0";
-  const [cartRows, pairRows, affRows, candRows, promoRows] = await env.DB.batch([
+
+  const [cartRows, pairRows, affRows, candRows, promoRows, popRows] = await env.DB.batch([
     env.DB.prepare(`SELECT * FROM menu_items WHERE id IN (${marks})`).bind(...cartIds),
     env.DB.prepare(
-      `SELECT item_b, SUM(cnt) AS c FROM item_pairs WHERE item_a IN (${marks}) AND daypart = ? GROUP BY item_b`,
-    ).bind(...cartIds, daypart),
+      `SELECT item_a, item_b, cnt FROM item_pairs_c WHERE cluster=? AND item_a IN (${marks}) AND daypart=?`,
+    ).bind(store.cluster, ...cartIds, daypart),
     env.DB.prepare("SELECT anchor_category, addon_category, weight, reason FROM affinities"),
-    env.DB.prepare("SELECT * FROM menu_items WHERE available = 1"),
+    env.DB.prepare(
+      `SELECT m.*, si.stock, si.par_level, COALESCE(si.available,1) AS inv_available
+       FROM menu_items m LEFT JOIN store_inventory si ON si.item_id = m.id AND si.store_id = ?
+       WHERE m.available = 1`,
+    ).bind(storeId),
     env.DB.prepare("SELECT * FROM promotions WHERE active = 1"),
+    env.DB.prepare("SELECT item_id, cnt, share FROM item_popularity WHERE cluster=? AND daypart=?").bind(store.cluster, daypart),
   ]);
-  tel.emit("d1_query", "rec", "d1", `co-occurrence + catalog lookup (daypart=${daypart})`, { cart: cartIds, daypart }, Date.now() - t0);
+  tel.emit("d1_query", "rec", "d1", `POS pairs + inventory + popularity (${store.name} · ${store.cluster} · ${daypart}${festive ? " · " + (holiday ?? "weekend") : ""})`, { store: storeId, cluster: store.cluster, daypart }, Date.now() - t0);
 
   const cartItems = cartRows.results as unknown as MenuItem[];
-  const pairs = new Map((pairRows.results as { item_b: number; c: number }[]).map((r) => [r.item_b, r.c]));
-  const maxPair = Math.max(1, ...pairs.values());
+  const rawPairs = pairRows.results as { item_a: number; item_b: number; cnt: number }[];
+  const pairSum = new Map<number, number>();          // candidate -> Σ cnt over anchors
+  const pairByAnchor = new Map<string, number>();     // `${a}|${b}` -> cnt (for honest attach %)
+  for (const p of rawPairs) {
+    pairSum.set(p.item_b, (pairSum.get(p.item_b) ?? 0) + p.cnt);
+    pairByAnchor.set(`${p.item_a}|${p.item_b}`, p.cnt);
+  }
+  const maxPair = Math.max(1, ...pairSum.values());
+  const popMap = new Map((popRows.results as { item_id: number; cnt: number; share: number }[]).map((r) => [r.item_id, r]));
+  const maxShare = Math.max(0.001, ...[...popMap.values()].map((r) => r.share));
+
   const anchorCats = new Set(cartItems.map((i) => i.category));
   const lastAnchorCat = cartItems.length ? cartItems[cartItems.length - 1].category : null;
   const affs = (affRows.results as { anchor_category: string; addon_category: string; weight: number; reason: string }[])
@@ -86,11 +129,11 @@ export async function recommend(
   const priceCap = Math.max(45000, subtotal * 0.4);
 
   const inCart = new Set(cartIds);
-  const candidates = (candRows.results as unknown as MenuItem[]).filter((m) => {
+  const candidates = (candRows.results as unknown as Candidate[]).filter((m) => {
     if (inCart.has(m.id)) return false;
+    if (!m.inv_available) return false;
+    if (m.stock != null && m.stock <= 5) return false;   // protect near-stockout items
     if (m.price > priceCap) return false;
-    // don't recommend another main of the same category the customer just picked,
-    // except a combo upgrade
     if (lastAnchorCat && m.category === lastAnchorCat && m.category !== "combo") return false;
     return true;
   });
@@ -98,19 +141,28 @@ export async function recommend(
   const scored = candidates.map((m) => {
     const tags: string[] = m.tags ? JSON.parse(m.tags) : [];
     const breakdown: Record<string, number> = {};
-    if (w.cooccurrence) breakdown.cooccurrence = w.cooccurrence * ((pairs.get(m.id) ?? 0) / maxPair);
+    if (w.cooccurrence) breakdown.cooccurrence = w.cooccurrence * ((pairSum.get(m.id) ?? 0) / maxPair);
     if (w.affinity) {
       const aw = Math.max(0, ...affs.filter((a) => a.addon_category === m.category).map((a) => a.weight));
       breakdown.affinity = w.affinity * aw;
     }
-    if (w.daypart) breakdown.daypart = w.daypart * (tags.includes(daypart) ? 1 : 0);
+    if (w.daypart) {
+      const fits = tags.includes(daypart) || (festive && tags.includes("sharing"));
+      breakdown.daypart = w.daypart * (fits ? 1 : 0);
+    }
     if (w.promo) {
       const hasPromo = activePromos.some((p) =>
         (p.item_id != null && p.item_id === m.id) || (p.scope_category != null && p.scope_category === m.category));
       breakdown.promo = w.promo * (hasPromo ? 1 : 0);
     }
+    if (w.inventory) {
+      // stock above par → push it; unknown inventory → neutral
+      const posture = m.stock == null || m.par_level == null
+        ? 0.5 : clamp01(0.5 + 0.5 * ((m.stock - m.par_level) / Math.max(m.par_level, 1)));
+      breakdown.inventory = w.inventory * posture;
+    }
     if (w.margin) breakdown.margin = w.margin * (m.margin_pct / 100);
-    if (w.popularity) breakdown.popularity = w.popularity * m.popularity;
+    if (w.popularity) breakdown.popularity = w.popularity * ((popMap.get(m.id)?.share ?? m.popularity * maxShare * 0.5) / maxShare);
     const score = Object.values(breakdown).reduce((s, v) => s + v, 0);
     return { m, score, breakdown };
   }).sort((a, b) => b.score - a.score);
@@ -125,13 +177,26 @@ export async function recommend(
     if (slate.length >= slots) break;
   }
 
-  tel.emit("rec_scored", "rec", "worker", `scored ${candidates.length} candidates → top ${slate.length} [${daypart}]`, {
+  tel.emit("rec_scored", "rec", "worker", `scored ${candidates.length} candidates → top ${slate.length} [${store.cluster}/${daypart}${festive ? "/festive" : ""}]`, {
+    store: store.name, cluster: store.cluster,
     top: slate.map((s) => ({ id: s.m.id, name: s.m.name, score: +s.score.toFixed(3), breakdown: Object.fromEntries(Object.entries(s.breakdown).map(([k, v]) => [k, +v.toFixed(3)])) })),
     signals: enabled,
   });
 
+  // honest attach rate: max over anchors of P(candidate | anchor basket) in this cluster+daypart
+  const attachPct = (candId: number): number | null => {
+    let best = 0;
+    for (const a of cartIds) {
+      const pair = pairByAnchor.get(`${a}|${candId}`) ?? 0;
+      const anchorCnt = popMap.get(a)?.cnt ?? 0;
+      if (anchorCnt >= 20 && pair > 0) best = Math.max(best, pair / anchorCnt);
+    }
+    const pct = Math.round(best * 100);
+    return pct >= 10 ? Math.min(pct, 85) : null;
+  };
+
   const recs: Recommendation[] = slate.map((s) => {
-    const coPct = pairs.get(s.m.id) ? Math.min(85, Math.round(40 + ((pairs.get(s.m.id) ?? 0) / maxPair) * 45)) : null;
+    const coPct = attachPct(s.m.id);
     const promo = activePromos.find((p) => (p.item_id != null && p.item_id === s.m.id) || (p.scope_category != null && p.scope_category === s.m.category));
     return {
       id: s.m.id, name: s.m.name, name_en: s.m.name_en, category: s.m.category,
@@ -149,7 +214,7 @@ export async function recommend(
     tel.emit("llm_call", "rec", "llm", "pitch generation (gpt-oss-120b)", { items: recs.map((r) => r.name) });
     try {
       const pitched = await Promise.race([
-        llmPitch(env, cartItems, recs, daypart),
+        llmPitch(env, cartItems, recs, daypart, store, festive),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
       ]);
       if (pitched) {
@@ -167,12 +232,14 @@ export async function recommend(
     }
   }
 
-  // log impression for acceptance metrics
-  await env.DB.prepare(
-    "INSERT INTO rec_events (session_id, trigger, anchor_items, shown_items) VALUES (?,?,?,?)",
-  ).bind(sessionId, trigger, JSON.stringify(cartIds), JSON.stringify(recs.map((r) => r.id))).run();
+  // log impression for acceptance metrics (simulator runs don't count)
+  if (trigger !== "simulator") {
+    await env.DB.prepare(
+      "INSERT INTO rec_events (session_id, trigger, anchor_items, shown_items) VALUES (?,?,?,?)",
+    ).bind(sessionId, trigger, JSON.stringify(cartIds), JSON.stringify(recs.map((r) => r.id))).run();
+  }
 
-  return { items: recs, daypart, signals_used: enabled };
+  return { items: recs, daypart, store, festive, holiday, signals_used: enabled };
 }
 
 function fallbackPitch(m: MenuItem, coPct: number | null, promo: Promo | undefined, lang: "vi" | "en"): string {
@@ -195,10 +262,12 @@ async function llmPitch(
   cartItems: MenuItem[],
   recs: Recommendation[],
   daypart: Daypart,
+  store: StoreInfo,
+  festive: boolean,
 ): Promise<{ id: number; pitch_vn: string; pitch_en: string }[] | null> {
-  const prompt = `You write kiosk upsell one-liners for KFC Vietnam. Cart: ${cartItems.map((i) => i.name).join(", ")}. Daypart: ${daypart}.
-Candidates (with data-driven reasons): ${JSON.stringify(recs.map((r) => ({ id: r.id, name: r.name, price: r.price_display, co_pct: r.co_pct, promo: r.promo_code })))}.
-For EACH candidate return one short, appetizing pitch line (max 14 words) in Vietnamese and English. Mention the co_pct stat or promo when present. Return ONLY JSON:
+  const prompt = `You write kiosk upsell one-liners for ${store.name} (a ${store.cluster}-area KFC in Vietnam). Cart: ${cartItems.map((i) => i.name).join(", ")}. Daypart: ${daypart}${festive ? " (weekend/holiday — family mood)" : ""}.
+Candidates (with data-driven reasons): ${JSON.stringify(recs.map((r) => ({ id: r.id, name: r.name, price: r.price_display, attach_pct: r.co_pct, promo: r.promo_code })))}.
+For EACH candidate return one short, appetizing pitch line (max 14 words) in Vietnamese and English. Mention the attach_pct stat or promo when present. Return ONLY JSON:
 {"items":[{"id":number,"pitch_vn":string,"pitch_en":string}]}`;
   // gpt-oss on Workers AI speaks the Responses API (`input`), not chat `messages`.
   const result = (await env.AI.run("@cf/openai/gpt-oss-120b" as never, {

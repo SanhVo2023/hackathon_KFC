@@ -41,12 +41,17 @@ Typical turn latency: **2–7s** including tool round-trips (measured by `test/c
 
 A two-layer design so the kiosk moment is fast, explainable, and still generative:
 
-- **Layer 1 — deterministic 6-signal scorer** (~70ms, one D1 batch): co-occurrence from
-  5,000 POS baskets precomputed per daypart (`item_pairs`), affinity rules, daypart tag fit,
-  active promo boost, margin, popularity. Weights are admin-configurable; disabled signals
-  are zeroed and the rest renormalized. Constraints: exclude cart items and the anchor's own
-  category, addon ≤ price cap, max one item per category in the slate. Every slate ships with
-  a per-signal score breakdown (visible in telemetry — the AI is auditable, not a black box).
+- **Layer 1 — deterministic 7-signal scorer** (~70ms, one D1 batch): co-occurrence from
+  9,000 POS baskets precomputed per **store cluster × daypart** (each of KFC's 250+ sites maps
+  to a cluster: mall / office / residential / tourist — so every kiosk is tailored to its
+  store's actual demand patterns), affinity rules, daypart fit with weekend/holiday boost,
+  active promo boost, **inventory posture** (pushes overstocked items, protects near-stockout,
+  never recommends what the store doesn't have), margin, and POS-derived popularity. Weights
+  are admin-configurable; disabled signals are zeroed and the rest renormalized. Constraints:
+  exclude cart items and the anchor's own category, addon ≤ price cap, max one item per
+  category in the slate. Every slate ships with a per-signal score breakdown (visible in
+  telemetry and the admin what-if simulator — the AI is auditable, not a black box). Pitch
+  stats are honest attach rates: P(addon | anchor basket) within the store's cluster.
 - **Layer 2 — LLM voice:** gpt-oss-120b turns the top-3 (with their statistical reasons and
   active promos) into short bilingual appetite-driven pitch lines, `Promise.race`d against a
   **1.2s timeout**; on timeout the customer sees deterministic copy built from the same data.

@@ -24,24 +24,37 @@
 ## What we built
 
 ### 1. Recommendation engine (P2) — deterministic scoring × LLM voice
-Every rec moment (item added, cart review, agent tool call) runs a **6-signal scorer** over
+**Context = store cluster × location × time × day/holiday × inventory × promos × cart.**
+Every rec moment (item added, cart review, agent tool call) runs a **7-signal scorer** over
 D1 in one batch (~70ms):
 
 ```
-score = .35·co-occurrence (5,000 synthetic POS baskets, precomputed pairs per daypart)
-      + .20·affinity rules (anchor→addon category weights)
-      + .15·daypart fit    (breakfast/lunch/tea/dinner/late, Vietnam time)
+score = .30·co-occurrence (9,000 POS baskets, pairs keyed by STORE CLUSTER × daypart)
+      + .15·affinity rules (anchor→addon category weights)
+      + .15·daypart fit    (breakfast/lunch/tea/dinner/late + weekend/holiday boost)
       + .15·promo calendar (time-of-day + day-of-week aware promotions)
-      + .10·margin  + .05·popularity
+      + .10·inventory posture (push overstock, protect near-stockout, never suggest sold-out)
+      + .10·margin  + .05·popularity (POS-derived, per cluster+daypart)
 ```
 
+**Per-store tailoring:** the 250+ stores are grouped into site clusters (mall / office /
+residential / tourist), each with its own mined basket patterns — the same fried-chicken
+cart gets *Pepsi + Salad + Burger Gà Yo* at an office store at lunch, but *7Up + Fries +
+Ice Cream* at a mall store at dinner. Verified in the test suite. Each kiosk sells only what
+its own store has in stock, and orders decrement live inventory.
+
 The top-3 slate then gets its bilingual sales pitch written by **gpt-oss-120b** (Workers AI),
-raced against a 1.2s timeout with deterministic data-driven copy as fallback
-("83% khách chọn món giống bạn cũng thêm Kem Ốc Quế"). Admin can toggle each signal live —
-the slate visibly changes, and the diagram shows the changed data path.
+raced against a 1.2s timeout with deterministic data-driven copy as fallback — with an
+**honest attach rate** ("52% khách chọn món giống bạn cũng thêm Pepsi" = real
+P(addon | anchor) from the cluster's baskets). Admin can toggle each signal live — the slate
+visibly changes, and the diagram shows the changed data path.
 
 Every impression/accept/dismiss is logged → the admin dashboard reports **AOV with-rec vs
 without-rec** (baseline shows ≈ +15%, in KFC's own projected band) and acceptance rate.
+The admin **what-if simulator** lets marketing preview any store × daypart × cart slate with
+per-signal score breakdowns — the manual-curation replacement, made tangible. A
+**demand/stockout forecast** (from 90 days of POS history) covers the Predictive Analytics
+requirement: expected orders per daypart plus projected stockout ETAs per item.
 
 ### 2. Conversational ordering agent (P4)
 An agent loop (max 6 steps) on **Workers AI** with **9 D1-grounded tools**: `search_menu`,
@@ -70,8 +83,9 @@ LLM pitch on/off, slots), menu 86-ing, promotion toggles, live event log. All Vi
 - **Menu:** real KFC Vietnam items, prices and official images, crawled from
   kfcvietnam.com.vn with **TinyFish** (`tinyfish agent run`, output in `seed/crawl-menu.json`,
   run id `7305956e`), merged with a curated catalog for category coverage → 48 items.
-- **POS history:** 5,000 synthetic transactions over 90 days with realistic daypart/day-of-week
-  basket archetypes → precomputed `item_pairs` co-occurrence per daypart.
+- **POS history:** 9,000 synthetic transactions over 90 days across 6 stores in 4 site
+  clusters, with cluster-specific daypart/basket archetypes → precomputed co-occurrence and
+  popularity per cluster × daypart. Per-store inventory (stock vs par level) + holiday calendar.
 - **Baseline ops data:** 120 stratified orders (matched base distributions; AI addons strictly
   additive) so the AOV counterfactual is honest.
 

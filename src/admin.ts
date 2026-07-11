@@ -29,10 +29,84 @@ export async function handleAdmin(
     return json({ ok: true, settings: await getSettings(env) });
   }
 
+  // ---------- stores ----------
+  if (path === "/stores" && method === "GET") {
+    const [stores, settings] = await Promise.all([
+      env.DB.prepare("SELECT * FROM stores ORDER BY id").all(),
+      getSettings(env),
+    ]);
+    return json({ stores: stores.results, current_store: Number(settings.current_store ?? 1) });
+  }
+
+  const invMatch = path.match(/^\/inventory\/(\d+)\/(\d+)$/);
+  if (invMatch && method === "PUT") {
+    const body = (await request.json()) as { stock?: number; available?: boolean };
+    if (body.stock !== undefined) {
+      await env.DB.prepare("UPDATE store_inventory SET stock=? WHERE store_id=? AND item_id=?")
+        .bind(Math.max(0, body.stock), invMatch[1], invMatch[2]).run();
+    }
+    if (body.available !== undefined) {
+      await env.DB.prepare("UPDATE store_inventory SET available=? WHERE store_id=? AND item_id=?")
+        .bind(body.available ? 1 : 0, invMatch[1], invMatch[2]).run();
+    }
+    tel.emit("config_change", "admin", "d1", `inventory store#${invMatch[1]} item#${invMatch[2]}: ${JSON.stringify(body)}`);
+    return json({ ok: true });
+  }
+
+  // demand + stockout forecast from 90 days of POS history (Predictive Analytics)
+  if (path === "/forecast" && method === "GET") {
+    const settings = await getSettings(env);
+    const storeId = Number(url.searchParams.get("store_id") ?? settings.current_store ?? 1);
+    const [byDaypart, inv, pops, store] = await Promise.all([
+      env.DB.prepare(
+        "SELECT daypart, COUNT(*)/90.0 AS orders_per_day FROM pos_orders WHERE store_id=? GROUP BY daypart",
+      ).bind(storeId).all<{ daypart: string; orders_per_day: number }>(),
+      env.DB.prepare(
+        `SELECT si.item_id, m.name, si.stock, si.par_level FROM store_inventory si
+         JOIN menu_items m ON m.id = si.item_id WHERE si.store_id=? AND si.available=1`,
+      ).bind(storeId).all<{ item_id: number; name: string; stock: number; par_level: number }>(),
+      env.DB.prepare(
+        `SELECT p.item_id, p.daypart, p.share FROM item_popularity p
+         JOIN stores s ON s.cluster = p.cluster WHERE s.id = ?`,
+      ).bind(storeId).all<{ item_id: number; daypart: string; share: number }>(),
+      env.DB.prepare("SELECT * FROM stores WHERE id=?").bind(storeId).first(),
+    ]);
+    const dayVolume = new Map(byDaypart.results.map((r) => [r.daypart, r.orders_per_day]));
+    // expected daily units of an item = Σ over dayparts (basket share × baskets/day)
+    const dailyUse = new Map<number, number>();
+    for (const p of pops.results) {
+      dailyUse.set(p.item_id, (dailyUse.get(p.item_id) ?? 0) + p.share * (dayVolume.get(p.daypart) ?? 0));
+    }
+    const stockouts = inv.results
+      .map((i) => ({ ...i, daily_use: +(dailyUse.get(i.item_id) ?? 0).toFixed(1) }))
+      .filter((i) => i.daily_use > 0.3)
+      .map((i) => ({ ...i, days_left: +(i.stock / i.daily_use).toFixed(1) }))
+      .sort((a, b) => a.days_left - b.days_left)
+      .slice(0, 6);
+    const overstock = inv.results
+      .filter((i) => i.stock > i.par_level * 1.5)
+      .map((i) => ({ ...i, excess_pct: Math.round(((i.stock - i.par_level) / i.par_level) * 100) }))
+      .sort((a, b) => b.excess_pct - a.excess_pct)
+      .slice(0, 4);
+    return json({
+      store,
+      demand_by_daypart: byDaypart.results.map((r) => ({ daypart: r.daypart, orders_per_day: +r.orders_per_day.toFixed(1) })),
+      projected_stockouts: stockouts,
+      overstock_to_push: overstock,
+      note: "baseline = 90 ngày lịch sử POS của cụm cửa hàng này",
+    });
+  }
+
   // ---------- menu ----------
   if (path === "/menu" && method === "GET") {
-    const rs = await env.DB.prepare("SELECT * FROM menu_items ORDER BY category, price").all();
-    return json({ items: rs.results });
+    const settings = await getSettings(env);
+    const storeId = Number(url.searchParams.get("store_id") ?? settings.current_store ?? 1);
+    const rs = await env.DB.prepare(
+      `SELECT m.*, si.stock, si.par_level, COALESCE(si.available,1) AS store_available
+       FROM menu_items m LEFT JOIN store_inventory si ON si.item_id = m.id AND si.store_id = ?
+       ORDER BY m.category, m.price`,
+    ).bind(storeId).all();
+    return json({ items: rs.results, store_id: storeId });
   }
   const menuMatch = path.match(/^\/menu\/(\d+)$/);
   if (menuMatch && method === "PUT") {

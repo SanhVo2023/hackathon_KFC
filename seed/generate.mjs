@@ -187,6 +187,48 @@ const AFFINITIES = [
   ["drink", "dessert", 0.4, "Ngọt mát đi cùng nhau"],
 ];
 
+// ---------- 4b. stores & clusters ----------
+// Site situation differs per store; the engine keys co-occurrence and
+// popularity by cluster so each kiosk is tailored to its store's reality.
+const STORES = [
+  { id: 1, name: "KFC Nguyễn Văn Trỗi", district: "Q. Phú Nhuận", cluster: "residential" },
+  { id: 2, name: "KFC Vincom Đồng Khởi", district: "Q.1 (TTTM)", cluster: "mall" },
+  { id: 3, name: "KFC Landmark 81", district: "Bình Thạnh (VP)", cluster: "office" },
+  { id: 4, name: "KFC Bùi Viện", district: "Q.1 (phố Tây)", cluster: "tourist" },
+  { id: 5, name: "KFC Aeon Tân Phú", district: "Tân Phú (TTTM)", cluster: "mall" },
+  { id: 6, name: "KFC Phú Mỹ Hưng", district: "Q.7", cluster: "residential" },
+];
+const CLUSTERS = ["mall", "office", "residential", "tourist"];
+
+// how each cluster's crowd orders differently
+const CLUSTER_DAYPART = {
+  office:      { breakfast: 12, lunch: 45, tea: 18, dinner: 17, late: 8 },
+  mall:        { breakfast: 4,  lunch: 26, tea: 22, dinner: 38, late: 10 },
+  residential: { breakfast: 5,  lunch: 22, tea: 12, dinner: 46, late: 15 },
+  tourist:     { breakfast: 8,  lunch: 22, tea: 20, dinner: 28, late: 22 },
+};
+function clusterBias(cluster, item) {
+  const tags = JSON.parse(item.tags ?? "[]");
+  const sharing = tags.includes("sharing");
+  switch (cluster) {
+    case "office":
+      return (item.category === "burger-rice" ? 1.8 : 1) * (sharing ? 0.35 : 1) * (item.category === "combo" && !sharing ? 1.5 : 1);
+    case "mall":
+      return (sharing ? 1.9 : 1) * (item.category === "dessert" ? 1.6 : 1) * (item.category === "snack" ? 1.25 : 1);
+    case "residential":
+      return (sharing ? 1.6 : 1) * (item.category === "chicken" ? 1.45 : 1);
+    case "tourist":
+      return (item.category === "dessert" ? 1.5 : 1) * (item.category === "drink" ? 1.4 : 1) * (item.category === "snack" ? 1.4 : 1) * (sharing ? 0.85 : 1);
+    default: return 1;
+  }
+}
+
+const HOLIDAYS = [
+  ["2026-07-27", "Ngày Thương binh Liệt sĩ (weekend-level traffic)"],
+  ["2026-09-02", "Quốc khánh 2/9"],
+  ["2026-09-03", "Nghỉ lễ Quốc khánh"],
+];
+
 // ---------- 5. synthetic POS history -> co-occurrence pairs ----------
 const byCat = (c) => catalog.filter((i) => i.category === c);
 const withTag = (arr, t) => arr.filter((i) => JSON.parse(i.tags).includes(t));
@@ -207,23 +249,38 @@ const ARCHETYPES = {
 };
 const DAYPART_WEIGHT = { breakfast: 5, lunch: 30, tea: 15, dinner: 38, late: 12 };
 
+function samplePopBiased(arr, cluster) {
+  if (!arr.length) return null;
+  return weightedPick(arr.map((i) => [i, i.pop * clusterBias(cluster, i)]));
+}
+
 const posOrders = [];
-const pairCounts = new Map(); // `${a}|${b}|${daypart}` -> cnt
+const pairCountsC = new Map();   // `${cluster}|${a}|${b}|${daypart}` -> cnt
+const popCounts = new Map();     // `${cluster}|${item}|${daypart}` -> baskets containing item
+const basketTotals = new Map();  // `${cluster}|${daypart}` -> baskets
+const globalItemCount = new Map();
 const start = new Date("2026-04-12T00:00:00Z");
-for (let n = 0; n < 5000; n++) {
+for (let n = 0; n < 9000; n++) {
+  const store = pick(STORES);
+  const cluster = store.cluster;
   const daysAgo = Math.floor(rand() * 90);
   const d = new Date(start.getTime() + daysAgo * 86400000);
   let dow = d.getUTCDay();
-  // weekends busier: resample weekday->weekend 25% of the time
-  if (rand() < 0.25) { dow = pick([0, 6]); }
-  const daypart = weightedPick(Object.entries(DAYPART_WEIGHT));
+  // weekends busier (malls especially): resample weekday->weekend
+  if (rand() < (cluster === "mall" ? 0.35 : 0.25)) { dow = pick([0, 6]); }
+  const daypart = weightedPick(Object.entries(CLUSTER_DAYPART[cluster]));
   const [h0, h1] = DAYPART_HOURS[daypart];
   const hour = h0 + Math.floor(rand() * (h1 - h0));
   const slots = weightedPick(ARCHETYPES[daypart]);
   const chosen = new Map();
   for (const cat of slots) {
     const pool = daypart === "breakfast" || daypart === "tea" ? (withTag(byCat(cat), daypart).length ? withTag(byCat(cat), daypart) : byCat(cat)) : byCat(cat);
-    const item = samplePop(pool);
+    const item = samplePopBiased(pool, cluster);
+    if (item) chosen.set(item.id, (chosen.get(item.id) ?? 0) + 1);
+  }
+  // weekend family effect: sharing add-on for mall/residential dinners
+  if ((dow === 0 || dow === 6) && ["mall", "residential"].includes(cluster) && daypart === "dinner" && rand() < 0.3) {
+    const item = samplePopBiased(byCat("dessert"), cluster);
     if (item) chosen.set(item.id, (chosen.get(item.id) ?? 0) + 1);
   }
   // 10% noise: one random extra item
@@ -232,15 +289,46 @@ for (let n = 0; n < 5000; n++) {
   const items = [...chosen.entries()].map(([item_id, qty]) => ({ item_id, qty }));
   const total = items.reduce((s, it) => s + (catalog.find((c) => c.id === it.item_id)?.price ?? 0) * it.qty, 0);
   const ts = `${d.toISOString().slice(0, 10)} ${String(hour).padStart(2, "0")}:${String(Math.floor(rand() * 60)).padStart(2, "0")}:00`;
-  posOrders.push({ ordered_at: ts, daypart, dow, store_id: 1 + Math.floor(rand() * 5), items: JSON.stringify(items), total });
+  posOrders.push({ ordered_at: ts, daypart, dow, store_id: store.id, items: JSON.stringify(items), total });
+
+  basketTotals.set(`${cluster}|${daypart}`, (basketTotals.get(`${cluster}|${daypart}`) ?? 0) + 1);
   const ids = [...chosen.keys()];
+  for (const id of ids) {
+    popCounts.set(`${cluster}|${id}|${daypart}`, (popCounts.get(`${cluster}|${id}|${daypart}`) ?? 0) + 1);
+    globalItemCount.set(id, (globalItemCount.get(id) ?? 0) + 1);
+  }
   for (let i = 0; i < ids.length; i++) for (let j = 0; j < ids.length; j++) {
     if (i === j) continue;
-    const k = `${ids[i]}|${ids[j]}|${daypart}`;
-    pairCounts.set(k, (pairCounts.get(k) ?? 0) + 1);
+    const k = `${cluster}|${ids[i]}|${ids[j]}|${daypart}`;
+    pairCountsC.set(k, (pairCountsC.get(k) ?? 0) + 1);
   }
 }
-console.log(`pos orders: ${posOrders.length}, pairs: ${pairCounts.size}`);
+// popularity is now DERIVED from POS frequency, not invented
+const maxCount = Math.max(...globalItemCount.values());
+for (const item of catalog) {
+  item.pop = +(0.05 + 0.9 * ((globalItemCount.get(item.id) ?? 0) / maxCount)).toFixed(2);
+}
+console.log(`pos orders: ${posOrders.length}, cluster pairs: ${pairCountsC.size}, pop entries: ${popCounts.size}`);
+
+// ---------- 5b. per-store inventory ----------
+// stock vs par tells the engine what to push (overstock) and protect (low).
+const inventory = [];
+for (const store of STORES) {
+  for (const item of catalog) {
+    const par = 30 + Math.floor(item.pop * 50);
+    let stock = Math.max(0, Math.round(par * (0.4 + rand() * 1.3)));
+    inventory.push({ store_id: store.id, item_id: item.id, stock, par, available: 1 });
+  }
+}
+// narrative cases for the demo
+const zinger = catalog.find((i) => fold(i.name).includes("burger zinger") && !i.is_combo);
+const eggTart = catalog.find((i) => fold(i.name).includes("banh trung"));
+const pepsiCan = catalog.find((i) => fold(i.name).includes("pepsi (lon)"));
+for (const inv of inventory) {
+  if (zinger && inv.store_id === 2 && inv.item_id === zinger.id) { inv.stock = 0; }            // mall store 86'd Zinger
+  if (eggTart && inv.store_id === 1 && inv.item_id === eggTart.id) { inv.stock = inv.par * 3; } // overstock: push egg tarts
+  if (pepsiCan && inv.store_id === 3 && inv.item_id === pepsiCan.id) { inv.stock = 4; }         // office store nearly out
+}
 
 // ---------- 6. loyalty, staff, settings ----------
 const LOYALTY = [
@@ -257,12 +345,12 @@ const STAFF = [
   ["Quản lý Ca", "manager", 0],
 ];
 const SETTINGS = {
-  signals: { cooccurrence: true, affinity: true, daypart: true, promo: true, margin: true, popularity: true },
-  weights: { cooccurrence: 0.35, affinity: 0.2, daypart: 0.15, promo: 0.15, margin: 0.1, popularity: 0.05 },
+  signals: { cooccurrence: true, affinity: true, daypart: true, promo: true, inventory: true, margin: true, popularity: true },
+  weights: { cooccurrence: 0.3, affinity: 0.15, daypart: 0.15, promo: 0.15, inventory: 0.1, margin: 0.1, popularity: 0.05 },
   rec_slots: 3,
   llm_pitch: true,
   model: "workers-ai",
-  store_name: "KFC Nguyễn Văn Trỗi (Store #001)",
+  current_store: 1,
   languages: ["vi", "en"],
 };
 
@@ -327,6 +415,8 @@ const lines = [
   "DELETE FROM pos_orders; DELETE FROM item_pairs; DELETE FROM loyalty_members;",
   "DELETE FROM staff; DELETE FROM settings;",
   "DELETE FROM orders; DELETE FROM rec_events;",
+  "DELETE FROM stores; DELETE FROM store_inventory; DELETE FROM item_pairs_c;",
+  "DELETE FROM item_popularity; DELETE FROM holidays;",
 ];
 
 for (const i of catalog) {
@@ -351,12 +441,30 @@ for (let i = 0; i < posOrders.length; i += 50) {
     `(${esc(o.ordered_at)},${esc(o.daypart)},${o.dow},${o.store_id},${esc(o.items)},${o.total})`);
   lines.push(`INSERT INTO pos_orders (ordered_at,daypart,dow,store_id,items,total) VALUES ${chunk.join(",")};`);
 }
-const pairRows = [...pairCounts.entries()].map(([k, cnt]) => {
-  const [a, b, dp] = k.split("|");
-  return `(${a},${b},${esc(dp)},${cnt})`;
+const pairRows = [...pairCountsC.entries()].map(([k, cnt]) => {
+  const [cl, a, b, dp] = k.split("|");
+  return `(${esc(cl)},${a},${b},${esc(dp)},${cnt})`;
 });
 for (let i = 0; i < pairRows.length; i += 100) {
-  lines.push(`INSERT INTO item_pairs (item_a,item_b,daypart,cnt) VALUES ${pairRows.slice(i, i + 100).join(",")};`);
+  lines.push(`INSERT INTO item_pairs_c (cluster,item_a,item_b,daypart,cnt) VALUES ${pairRows.slice(i, i + 100).join(",")};`);
+}
+const popRows = [...popCounts.entries()].map(([k, cnt]) => {
+  const [cl, id, dp] = k.split("|");
+  const total = basketTotals.get(`${cl}|${dp}`) ?? 1;
+  return `(${esc(cl)},${id},${esc(dp)},${cnt},${(cnt / total).toFixed(4)})`;
+});
+for (let i = 0; i < popRows.length; i += 100) {
+  lines.push(`INSERT INTO item_popularity (cluster,item_id,daypart,cnt,share) VALUES ${popRows.slice(i, i + 100).join(",")};`);
+}
+for (const s of STORES) {
+  lines.push(`INSERT INTO stores (id,name,district,cluster) VALUES (${s.id},${esc(s.name)},${esc(s.district)},${esc(s.cluster)});`);
+}
+const invRows = inventory.map((v) => `(${v.store_id},${v.item_id},${v.stock},${v.par},${v.available})`);
+for (let i = 0; i < invRows.length; i += 100) {
+  lines.push(`INSERT INTO store_inventory (store_id,item_id,stock,par_level,available) VALUES ${invRows.slice(i, i + 100).join(",")};`);
+}
+for (const [date, name] of HOLIDAYS) {
+  lines.push(`INSERT INTO holidays (date,name) VALUES (${esc(date)},${esc(name)});`);
 }
 for (const [phone, name, points, tier] of LOYALTY) {
   lines.push(`INSERT INTO loyalty_members (phone,name,points,tier) VALUES (${esc(phone)},${esc(name)},${points},${esc(tier)});`);

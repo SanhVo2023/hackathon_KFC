@@ -25,13 +25,17 @@ Then: *"Tôi bị dị ứng đậu phộng, cho tôi gặp nhân viên"* →
 - Switch to `/admin` → Hỗ trợ khách: the conversation is there; reply as staff → it appears
   on the kiosk. "Human-in-the-loop is built in — the agent knows what it shouldn't handle."
 
-## 2:20 — The business case (30s)
-Open `/admin` Tổng quan:
-> "Orders with AI recommendations average **+15% higher** than orders without — measured,
-> not promised, and exactly the band KFC projected. 35% of suggestions get accepted.
-> Store managers control everything here — flip off the co-occurrence signal and the kiosk
-> changes its mind in real time. No data scientist needed."
-(Optionally flip a signal in AI Gợi ý and re-trigger a rec on the kiosk.)
+## 2:20 — Per-store intelligence + the business case (40s)
+Open `/admin` → AI Gợi ý → **Chạy thử gợi ý (what-if simulator)**:
+> "250 stores are not one store. Same fried-chicken cart: the office tower at lunch gets
+> Pepsi + salad; the mall on a Saturday night gets fries + ice cream for the kids. Every
+> kiosk mines its own cluster's baskets — and the inventory signal pushes what the store
+> has too much of, and never suggests what it's out of."
+Run it twice (Landmark 81/lunch vs Vincom/dinner) — slates visibly differ, with per-signal
+score bars. Then flip to Tổng quan:
+> "Orders with AI recommendations average **+15% higher** — measured, not promised, exactly
+> KFC's projected band. 35% acceptance. And the forecast card predicts today's demand per
+> daypart and which items stock out first — from the same POS history."
 
 ## 2:50 — Close (10s)
 > "One Cloudflare Worker, D1, Workers AI — pennies per store per day, deploys in seconds,
@@ -41,8 +45,12 @@ Open `/admin` Tổng quan:
 ## Q&A ammunition
 - **Latency?** Rec moment ≤1.5s (scorer 70ms; LLM raced vs 1.2s timeout with deterministic
   fallback copy). Chat turns 2–7s. All measured in `test/api-test.mjs` (34 green, run on prod).
-- **Real POS integration?** The engine reads a co-occurrence table; nightly job from any POS
-  export produces it. Menu/promos/loyalty are plain D1 tables mirroring their relational DB.
+- **Real POS integration?** The engine reads co-occurrence/popularity tables keyed by store
+  cluster; a nightly job from any POS export produces them. Menu/promos/loyalty/inventory are
+  plain D1 tables mirroring their relational DB.
+- **How do 250 stores differ?** Stores map to site clusters (mall/office/residential/tourist);
+  each cluster's basket patterns are mined separately. New store = assign a cluster, day one;
+  its own data refines it over time. Inventory and 86-ing are already per-store.
 - **Hallucination control?** Grounding rule + tools-only data; forced synthesis pass;
   every tool call and its result is on the telemetry stream (and Langfuse-ready).
 - **Why not a bigger model?** Dual adapter: set one secret and it runs gpt-4.1 (or any OpenAI

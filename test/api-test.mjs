@@ -169,7 +169,53 @@ let recItemIds = [];
   check("agent made ≥1 grounded tool call", toolCalls.length >= 1);
 }
 
-// 12. chat poll (HITL relay endpoint)
+// 12. multi-store context
+{
+  const st = await api("/api/admin/stores");
+  check(`stores present (got ${st.body.stores?.length})`, (st.body.stores?.length ?? 0) >= 6 && st.body.current_store >= 1);
+  const clusters = new Set((st.body.stores ?? []).map((s) => s.cluster));
+  check(`stores span ≥4 clusters (${[...clusters].join(",")})`, clusters.size >= 4);
+
+  // simulator: same cart, two different store/daypart contexts
+  const simA = await api("/api/recommend", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, trigger: "simulator", store_id: 3, daypart: "lunch", cart: [{ item_id: chicken.id, qty: 1 }] }),
+  });
+  const simB = await api("/api/recommend", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, trigger: "simulator", store_id: 2, daypart: "dinner", cart: [{ item_id: chicken.id, qty: 1 }] }),
+  });
+  check("simulator override reaches engine (office/lunch)", simA.body.store?.cluster === "office" && simA.body.daypart === "lunch");
+  check("simulator override reaches engine (mall/dinner)", simB.body.store?.cluster === "mall" && simB.body.daypart === "dinner");
+  console.log(`     office/lunch: ${(simA.body.items ?? []).map((i) => i.name).join(" | ")}`);
+  console.log(`     mall/dinner:  ${(simB.body.items ?? []).map((i) => i.name).join(" | ")}`);
+
+  // per-store inventory: Burger Zinger is 86'd at store 2 (mall), in stock at store 1
+  const menu1 = await api("/api/menu?store_id=1");
+  const menu2 = await api("/api/menu?store_id=2");
+  const zin1 = (menu1.body.items ?? []).some((i) => i.name === "Burger Zinger");
+  const zin2 = (menu2.body.items ?? []).some((i) => i.name === "Burger Zinger");
+  check("store 1 sells Burger Zinger, store 2 (out of stock) hides it", zin1 && !zin2, `s1=${zin1} s2=${zin2}`);
+
+  // forecast
+  const fc = await api("/api/admin/forecast");
+  check("forecast: demand by daypart present", (fc.body.demand_by_daypart?.length ?? 0) >= 4);
+  check("forecast: projected stockouts computed", Array.isArray(fc.body.projected_stockouts));
+  console.log(`     next stockout: ${fc.body.projected_stockouts?.[0]?.name} in ~${fc.body.projected_stockouts?.[0]?.days_left} days`);
+
+  // ordering decrements live inventory at the current store
+  const adminMenuBefore = await api("/api/admin/menu");
+  const target = (adminMenuBefore.body.items ?? []).find((i) => i.name === chicken.name);
+  const ord = await api("/api/order", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, order_type: "takeaway", items: [{ item_id: chicken.id, quantity: 2 }] }),
+  });
+  const adminMenuAfter = await api("/api/admin/menu");
+  const targetAfter = (adminMenuAfter.body.items ?? []).find((i) => i.name === chicken.name);
+  check("order decrements store inventory", ord.status === 200 && targetAfter.stock === target.stock - 2, `before=${target?.stock} after=${targetAfter?.stock}`);
+}
+
+// 13. chat poll (HITL relay endpoint)
 {
   const r = await api(`/api/chat/poll?session_id=${SESSION}&after=0`);
   check("chat poll returns transcript", r.status === 200 && Array.isArray(r.body.messages));
