@@ -125,7 +125,9 @@ ticker, Christmas combos appear, the rec window re-computes with 🏷️ promo c
 
 ## Assets
 - Live: https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev (`/` · `/kiosk` · `/admin`)
-- Screenshots: `4k-v4-prod.png`, `v5-cost-panel.jpeg`, `v5-attract-white-logo.jpeg`, `v4-xmas-scenario.jpeg`
+- **Demo video (Remotion):** `video/out/kfc-demo.mp4` — 82s, 1080p. Rebuild: `cd video && npx remotion render src/index.ts kfc-demo out/kfc-demo.mp4`. Preview/edit: `npx remotion studio src/index.ts`.
+- **Slide deck:** `slide-deck.html` (open in browser, arrow keys to present, F11) + `slide-deck.pdf`
+- Screenshots: `4k-v4-prod.png`, `asset-*.png` (journey steps, panels), `v5-*.jpeg`, `v4-xmas-scenario.jpeg`
 - Tests: `node test/api-test.mjs <url>` → 70 assertions
 - Declared stack (bonus prizes): **TinyFish** (menu crawl) · **OpenAI gpt-oss-120b** via
   **Cloudflare Workers AI** · **Cloudflare** Workers/D1/assets · **Gemini** (product/hero

@@ -127,8 +127,9 @@
     S.store = data.store;
     S.festive = data.festive;
     S.holiday = data.holiday;
-    // seasonal skin — same journey, festive dress (like real stores in December)
-    document.body.classList.toggle("xmas", /giáng sinh|noel|christmas/i.test(S.holiday ?? ""));
+    // seasonal skin — same journey, festive dress (like real stores in December).
+    // fold() first: D1 strings may arrive NFD, regex literals here are NFC.
+    document.body.classList.toggle("xmas", /giang sinh|noel|christmas/.test(fold(S.holiday ?? "")));
     if (data.store) $("#kh-store").textContent = data.store.name;
     S.byCat = {};
     for (const m of S.menu) (S.byCat[m.category] ??= []).push(m);
@@ -437,7 +438,8 @@
         W.chosen = chosen;
         W.mods = {};
         W.steps = buildSteps();
-        prefetchRecs(); // candidate changed — re-warm the engine
+        W.recs = null;      // stale slate belongs to the OTHER meal size — refetch
+        prefetchRecs();     // candidate changed — re-warm the engine
       }
       observe(`meal size: chose ${W.sizeChoice === "combo" ? `the combo (${W.chosen.name})` : `item only (${W.base.name})`}`);
     }
