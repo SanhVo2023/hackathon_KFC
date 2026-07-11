@@ -1,6 +1,7 @@
-// KFC self-order kiosk — full customer journey with a live customer-hypothesis
-// agent: camera glance at check-in (demo: photo upload), then every interaction
-// refines the guess that biases the recommendations.
+// KFC self-order kiosk v3 — the exact journey customers already know
+// (menu → meal size → customize → add on → review → added), with the AI
+// working invisibly: background profiling, preemptive rec prefetch, and
+// suggestions living INSIDE the native steps. No new concepts to learn.
 (() => {
   const KFC = window.KFC;
   const { $, $$, fmtVND, api, postEvent, CAT_META, DAYPART_META } = KFC;
@@ -9,80 +10,77 @@
   const L = {
     vi: {
       attract_sub: "Đặt món ngay tại đây", tap_to_start: "Chạm để bắt đầu",
-      attract_ai: "AI gợi ý món hợp khẩu vị riêng bạn",
-      camera_title: "Nhìn vào camera nhé!",
-      camera_sub: "AI nhìn một thoáng để gợi ý món hợp với bạn hơn — không lưu ảnh, không nhận diện danh tính.",
-      camera_hint: "Demo: chạm để tải ảnh lên", skip: "Bỏ qua →",
-      camera_scanning: "AI đang nhìn một thoáng…", camera_done: "✓ Xong! Gợi ý đã được cá nhân hóa.",
       where_eat: "Bạn dùng bữa ở đâu?", dine_in: "Ăn tại đây", takeaway: "Mang đi",
-      your_order: "Đơn của bạn", add_more: "+ Thêm món", checkout: "Thanh toán",
-      apply: "Áp dụng", check: "Kiểm tra", payment: "Thanh toán",
-      card: "Thẻ", cash: "Tiền mặt tại quầy", scan_qr: "Quét mã để thanh toán", back: "← Quay lại",
-      order_placed: "Đặt món thành công!", order_number_is: "Số đơn của bạn", new_order: "Bắt đầu đơn mới",
-      view_cart: "Xem đơn hàng", rec_title: "Gợi ý cho riêng bạn", no_thanks: "Không, cảm ơn",
-      added: "Đã thêm vào đơn", subtotal: "Tạm tính", discount: "Giảm giá", total: "Tổng cộng",
-      empty_cart: "Chưa có món nào. Chạm “+ Thêm món” nhé!",
+      back: "QUAY LẠI", continue: "TIẾP TỤC",
+      home: "TRANG CHỦ", step_size: "KÍCH CỠ PHẦN ĂN", step_customize: "TÙY CHỌN", step_addon: "THÊM MÓN", step_review: "XEM LẠI",
+      size_title: "CHỌN COMBO HOẶC MÓN LẺ", combo_meal: "PHẦN COMBO", item_only: "MÓN LẺ",
+      save_flag: (d) => `TIẾT KIỆM ${d}`, popular_flag: "ĐƯỢC CHỌN NHIỀU",
+      customize_title: "TÙY CHỌN", addon_title: "THÊM CHÚT GÌ NHÉ!",
+      addon_note: "Gợi ý riêng cho đơn của bạn — đổi mỗi ngày theo cửa hàng",
+      review_title: "XEM LẠI", customizations: "Tùy chọn của bạn",
+      added_title: "Đã thêm vào giỏ!", added_sub: "Tổng đơn của bạn đã được cập nhật.",
+      continue_ordering: "TIẾP TỤC CHỌN MÓN", complete_order: "HOÀN TẤT ĐƠN HÀNG",
+      cancel_order: "HỦY ĐƠN HÀNG", basket: "GIỎ HÀNG", pay: "THANH TOÁN",
+      your_order: "ĐƠN CỦA BẠN", add_more: "+ THÊM MÓN", checkout: "THANH TOÁN",
+      apply: "ÁP DỤNG", check: "KIỂM TRA", payment: "THANH TOÁN",
+      card: "Thẻ", cash: "Tiền mặt tại quầy", scan_qr: "Quét mã để thanh toán",
+      order_placed: "Đặt món thành công!", order_number_is: "Số đơn của bạn", new_order: "BẮT ĐẦU ĐƠN MỚI",
+      rec_title: "GỢI Ý CHO BẠN", added: "Đã thêm vào giỏ",
+      subtotal: "Tạm tính", discount: "Giảm giá", total: "Tổng cộng",
+      empty_cart: "Chưa có món nào trong giỏ.",
       status_received: "Đã nhận", status_preparing: "Đang chuẩn bị", status_ready: "Sẵn sàng", status_completed: "Hoàn tất",
       voucher_ok: (c, d) => `Mã ${c} hợp lệ: giảm ${d}`, voucher_bad: "Mã không áp dụng được lúc này",
       loyalty_ok: (n, p, t) => `Chào ${n}! Bạn có ${p} điểm (hạng ${t}).`, loyalty_bad: "Số này chưa là thành viên",
-      thinking: [
-        "Đang xem các đơn tương tự tại cửa hàng…",
-        "Đang kiểm tra bếp còn món gì…",
-        "Đang đoán khẩu vị của bạn…",
-        "AI đang viết lời mời riêng cho bạn…",
-      ],
-      add_to_order: "Thêm vào đơn",
+      thinking: ["Đang xem các đơn tương tự…", "Đang kiểm tra bếp…", "Đang chọn món hợp với bạn…"],
+      swap_save: (d) => `TIẾT KIỆM ${d}`, swap_more: (d) => `THÊM MÓN ${d}`, swap_btn: "ĐỔI",
     },
     en: {
       attract_sub: "Order right here", tap_to_start: "Tap to start",
-      attract_ai: "AI suggests dishes tailored to you",
-      camera_title: "Look at the camera!",
-      camera_sub: "The AI takes one quick glance to tailor suggestions — no photo stored, no identity recognition.",
-      camera_hint: "Demo: tap to upload a photo", skip: "Skip →",
-      camera_scanning: "AI is taking a glance…", camera_done: "✓ Done! Suggestions personalized.",
       where_eat: "Where are you eating?", dine_in: "Dine in", takeaway: "Take away",
-      your_order: "Your order", add_more: "+ Add items", checkout: "Checkout",
-      apply: "Apply", check: "Check", payment: "Payment",
-      card: "Card", cash: "Cash at counter", scan_qr: "Scan to pay", back: "← Back",
-      order_placed: "Order placed!", order_number_is: "Your order number", new_order: "Start new order",
-      view_cart: "View order", rec_title: "Picked for you", no_thanks: "No, thanks",
-      added: "Added to order", subtotal: "Subtotal", discount: "Discount", total: "Total",
-      empty_cart: "Nothing here yet. Tap “+ Add items”!",
+      back: "BACK", continue: "CONTINUE",
+      home: "HOME", step_size: "MEAL SIZE", step_customize: "CUSTOMIZE", step_addon: "ADD ON", step_review: "REVIEW",
+      size_title: "CHOOSE YOUR MEAL SIZE", combo_meal: "COMBO MEAL", item_only: "ITEM ONLY",
+      save_flag: (d) => `SAVE ${d}`, popular_flag: "MOST PICKED",
+      customize_title: "CUSTOMIZE", addon_title: "LET'S TOP IT UP!",
+      addon_note: "Picked for your order — changes with store and time of day",
+      review_title: "REVIEW", customizations: "Customizations",
+      added_title: "Item added to basket!", added_sub: "Your total has been updated.",
+      continue_ordering: "CONTINUE ORDERING", complete_order: "COMPLETE ORDER",
+      cancel_order: "CANCEL ORDER", basket: "BASKET", pay: "PAY",
+      your_order: "YOUR ORDER", add_more: "+ ADD ITEMS", checkout: "CHECKOUT",
+      apply: "APPLY", check: "CHECK", payment: "PAYMENT",
+      card: "Card", cash: "Cash at counter", scan_qr: "Scan to pay",
+      order_placed: "Order placed!", order_number_is: "Your order number", new_order: "START NEW ORDER",
+      rec_title: "PICKED FOR YOU", added: "Added to basket",
+      subtotal: "Subtotal", discount: "Discount", total: "Total",
+      empty_cart: "Your basket is empty.",
       status_received: "Received", status_preparing: "Preparing", status_ready: "Ready", status_completed: "Done",
       voucher_ok: (c, d) => `Code ${c} valid: ${d} off`, voucher_bad: "Code doesn't apply right now",
       loyalty_ok: (n, p, t) => `Hi ${n}! You have ${p} points (${t} tier).`, loyalty_bad: "Not a member yet",
-      thinking: [
-        "Reading similar orders at this store…",
-        "Checking what the kitchen has…",
-        "Guessing your taste…",
-        "AI is writing your personal pitch…",
-      ],
-      add_to_order: "Add to order",
+      thinking: ["Reading similar orders…", "Checking the kitchen…", "Picking what fits you…"],
+      swap_save: (d) => `SAVE ${d}`, swap_more: (d) => `MORE FOOD ${d}`, swap_btn: "SWAP",
     },
   };
 
   // ---------- state ----------
   const S = {
-    lang: "vi",
-    screen: "attract",
-    orderType: null,
+    lang: "vi", screen: "attract", orderType: null,
     menu: [], byCat: {}, cats: [], activeCat: null,
     daypart: null, promos: [], store: null, festive: false, holiday: null,
-    cart: [], // {item, qty, mods:[], fromRec:bool}
-    voucher: null, loyalty: null,
+    cart: [], voucher: null, loyalty: null,
     lastOrder: null, statusTimer: null,
-    recSheetItems: [],
-    thinkTimer: null,
+    pendingSwap: null,
   };
+  let W = null; // wizard state
 
   const t = (k, ...a) => { const v = L[S.lang][k]; return typeof v === "function" ? v(...a) : v; };
+  const itemName = (m) => (S.lang === "en" && m.name_en ? m.name_en : m.name);
+  const fold = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
 
   function applyI18n() {
     $$("[data-i18n]").forEach((el) => { const v = L[S.lang][el.dataset.i18n]; if (typeof v === "string") el.textContent = v; });
     $("#btn-lang").textContent = S.lang === "vi" ? "EN" : "VI";
   }
-
-  function itemName(m) { return S.lang === "en" && m.name_en ? m.name_en : m.name; }
 
   function toast(msg) {
     const el = $("#toast");
@@ -92,10 +90,10 @@
     el._t = setTimeout(() => el.classList.remove("show"), 1800);
   }
 
-  // fire-and-forget behavior signal to the profiler agent
+  // background behavior signal to the profiler — never awaited, never blocking
   function observe(observation) {
     postEvent("profile_signal", observation);
-    return api("/api/profile/event", { method: "POST", body: { session_id: KFC.sessionId, observation } }).catch(() => null);
+    api("/api/profile/event", { method: "POST", body: { session_id: KFC.sessionId, observation } }).catch(() => null);
   }
 
   // ---------- navigation ----------
@@ -103,15 +101,14 @@
     S.screen = screen;
     $$(".screen").forEach((s) => s.classList.remove("active"));
     $(`#screen-${screen}`).classList.add("active");
-    $("#kiosk-header").style.display = ["attract", "camera"].includes(screen) ? "none" : "flex";
-    $("#cart-bar").classList.toggle("hidden", !(screen === "menu" && S.cart.length));
+    $("#kiosk-header").style.display = screen === "attract" ? "none" : "flex";
     postEvent("screen_change", `kiosk screen → ${screen}`);
     if (screen === "cart") renderCart();
     if (screen === "attract") loadMenu().catch(() => {});
     if (screen === "confirm") launchConfetti();
   }
 
-  // ---------- menu ----------
+  // ---------- data ----------
   async function loadMenu() {
     const data = await api("/api/menu");
     S.menu = data.items;
@@ -126,25 +123,30 @@
     if (!S.cats.includes(S.activeCat)) S.activeCat = S.cats[0];
     const promoData = await api("/api/promotions");
     S.promos = promoData.promotions;
-    renderDaypartBanner();
-    renderCats();
+    renderContextStrip();
+    renderMenuRail();
     renderGrid();
+    renderBottomBar();
   }
 
-  function renderDaypartBanner() {
+  function renderContextStrip() {
     const dp = DAYPART_META[S.daypart] ?? {};
     const now = S.promos.filter((p) => p.applies_now);
-    const promoTxt = now.length ? ` · ${now[0].name}` : "";
-    const festiveTxt = S.holiday ? ` · 🎉 ${S.holiday}` : S.festive ? (S.lang === "vi" ? " · 🎉 Cuối tuần" : " · 🎉 Weekend") : "";
-    $("#daypart-banner").innerHTML = `${dp.icon ?? ""} <b>${S.lang === "vi" ? dp.vi : dp.en}</b>${festiveTxt}${promoTxt}`;
+    const festiveTxt = S.holiday ? ` · 🎉 ${S.holiday}` : S.festive ? (S.lang === "vi" ? " · Cuối tuần" : " · Weekend") : "";
+    $("#daypart-banner").textContent =
+      `${dp.icon ?? ""} ${S.lang === "vi" ? dp.vi : dp.en}${festiveTxt}${now.length ? ` · ${now[0].name}` : ""}`;
   }
 
-  function renderCats() {
-    $("#cat-rail").innerHTML = S.cats.map((c) => {
-      const meta = CAT_META[c];
-      return `<button class="cat-btn ${c === S.activeCat ? "active" : ""}" data-cat="${c}">
-        <span class="ci">${meta.icon.slice(0, 2)}</span><span>${S.lang === "vi" ? meta.vi : meta.en}</span></button>`;
-    }).join("");
+  // ---------- browse: rail + grid ----------
+  function renderMenuRail() {
+    $("#side-rail").innerHTML =
+      `<button class="rail-btn" data-home>${t("home")}</button>` +
+      S.cats.map((c) => {
+        const meta = CAT_META[c];
+        return `<button class="rail-btn ${c === S.activeCat ? "active" : ""}" data-cat="${c}">${S.lang === "vi" ? meta.vi : meta.en}</button>`;
+      }).join("");
+    const meta = CAT_META[S.activeCat];
+    $("#menu-title").textContent = meta ? (S.lang === "vi" ? meta.vi : meta.en) : "MENU";
   }
 
   function imgTag(m, cls, phCls) {
@@ -157,173 +159,288 @@
   function renderGrid() {
     const items = S.byCat[S.activeCat] ?? [];
     $("#menu-grid").innerHTML = items.map((m, i) => `
-      <button class="menu-card" data-id="${m.id}" style="animation-delay:${Math.min(i * 40, 300)}ms">
+      <button class="menu-card" data-id="${m.id}" style="animation-delay:${Math.min(i * 35, 280)}ms">
         ${imgTag(m, "mc-img", "mc-img-ph")}
-        <span class="mc-body">
-          <span class="mc-name">${itemName(m)}</span>
-          <span class="mc-price-row"><span class="mc-price">${fmtVND(m.price)}</span><span class="mc-add">+</span></span>
-        </span>
+        <span class="mc-name">${itemName(m)}</span>
+        <span class="mc-price">${fmtVND(m.price)}</span>
       </button>`).join("");
   }
 
-  // ---------- camera check-in ----------
-  async function handlePhoto(file) {
-    const status = $("#camera-status");
-    const vf = $("#viewfinder");
-    const img = await fileToImage(file);
-    // show the shot in the viewfinder + scanline
-    $("#vf-content").innerHTML = `<img src="${img.thumb}" class="vf-photo" alt="" />`;
-    vf.classList.add("scanning");
-    status.textContent = t("camera_scanning");
-    postEvent("profile_photo", "camera check-in photo captured");
-    try {
-      const out = await api("/api/profile/photo", {
-        method: "POST",
-        body: { session_id: KFC.sessionId, image: img.full, thumb: img.thumb },
-      });
-      vf.classList.remove("scanning");
-      vf.classList.add("done");
-      status.textContent = t("camera_done");
-      postEvent("profile_ready", `hypothesis: ${(out.profile?.persona ?? "").slice(0, 60)}`);
-    } catch (_) {
-      status.textContent = t("camera_done");
+  function renderBottomBar() {
+    const n = S.cart.reduce((s, l) => s + l.qty, 0);
+    $("#menu-bottom-bar").innerHTML = n
+      ? `<button class="bb-cart" id="bb-cart"><span class="n">${n}</span> ${t("basket")} · ${fmtVND(cartSubtotal())}</button>
+         <button class="bb-pay" id="bb-pay">${t("pay")}</button>`
+      : `<button class="bb-cancel" id="bb-cancel">${t("cancel_order")}</button>`;
+  }
+
+  // ---------- wizard ----------
+  const SYNTH_COMBO_GROUPS = () => [
+    { key: "soda", name: "CHỌN VỊ NƯỚC", name_en: "CHOOSE SODA FLAVOR", options: [
+      { name: "Pepsi", name_en: "Pepsi", delta: 0 }, { name: "7Up", name_en: "7Up", delta: 0 },
+      { name: "Mirinda Cam", name_en: "Mirinda Orange", delta: 0 }, { name: "Pepsi Không Đường", name_en: "Pepsi Zero", delta: 0 }] },
+    { key: "extra", name: "THÊM GÌ ĐÓ?", name_en: "ADD SOMETHING EXTRA?", options: [
+      { name: "Không, cảm ơn", name_en: "No, thanks", delta: 0 },
+      { name: "Thêm Phô Mai", name_en: "Extra Cheese", delta: 10000 },
+      { name: "Sốt Colonel", name_en: "Colonel Sauce", delta: 10000 }] },
+    { key: "upsize", name: "UPSIZE KHOAI TÂY", name_en: "UPSIZE CHIPS", options: [
+      { name: "Khoai Vừa", name_en: "Regular chips", delta: 0 }, { name: "Khoai Lớn", name_en: "Large chips", delta: 12000 }] },
+  ];
+
+  function modGroups(item) {
+    if (item.modifiers) { try { return JSON.parse(item.modifiers); } catch { /* fall through */ } }
+    if (item.is_combo) return SYNTH_COMBO_GROUPS();
+    return [];
+  }
+
+  // best combo counterpart for a single item — the native "meal size" upsell
+  function findComboFor(base) {
+    if (base.is_combo || !["chicken", "burger-rice"].includes(base.category)) return null;
+    const baseTokens = fold(base.name).split(/\s+/).filter((w) => w.length > 2);
+    let best = null;
+    for (const c of S.byCat.combo ?? []) {
+      let contents = [];
+      try { contents = c.combo_contents ? JSON.parse(c.combo_contents) : []; } catch { /* skip */ }
+      if (!contents.includes(base.category)) continue;
+      const cTokens = fold(c.name);
+      const overlap = baseTokens.filter((w) => cTokens.includes(w)).length;
+      const score = overlap * 10 + (c.popularity ?? 0);
+      if (!best || score > best.score) best = { combo: c, score, contents };
     }
-    setTimeout(() => show("ordertype"), 1100);
+    if (!best) return null;
+    // value vs buying the pieces separately
+    const extras = best.contents.filter((cat) => cat !== base.category);
+    let separately = base.price;
+    for (const cat of extras) {
+      const cheapest = (S.byCat[cat] ?? []).reduce((m, i) => (i.price < m ? i.price : m), Infinity);
+      if (cheapest < Infinity) separately += cheapest;
+    }
+    const delta = best.combo.price - separately;
+    return { combo: best.combo, extras, delta };
   }
 
-  function fileToImage(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const image = new Image();
-        image.onload = () => {
-          const scale = (max) => {
-            const r = Math.min(1, max / Math.max(image.width, image.height));
-            const c = document.createElement("canvas");
-            c.width = Math.round(image.width * r);
-            c.height = Math.round(image.height * r);
-            c.getContext("2d").drawImage(image, 0, 0, c.width, c.height);
-            return c.toDataURL("image/jpeg", 0.75);
-          };
-          resolve({ full: scale(512), thumb: scale(120) });
-        };
-        image.onerror = reject;
-        image.src = reader.result;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  function startWizard(base) {
+    const comboOpt = findComboFor(base);
+    W = {
+      base, comboOpt,
+      chosen: base,
+      sizeChoice: comboOpt ? (comboOpt.delta <= 0 ? "combo" : "combo") : "single", // AI preselects the combo — the familiar default
+      steps: [], stepIdx: 0,
+      mods: {}, qty: 1,
+      addons: new Map(),
+      recs: null, recsPromise: null,
+    };
+    if (comboOpt && W.sizeChoice === "combo") W.chosen = comboOpt.combo;
+    W.steps = buildSteps();
+    // PREEMPTIVE: profiler + rec engine start the moment the item is opened —
+    // by the time the customer reaches ADD ON, suggestions are already there.
+    observe(`viewing ${base.name} (${base.category})${comboOpt ? ", offered combo option" : ""}`);
+    prefetchRecs();
+    postEvent("tap", `opened meal builder: ${base.name}`);
+    show("wizard");
+    renderWizard();
   }
 
-  // ---------- item modal ----------
-  let modalState = null;
-  function openItem(id) {
-    const m = S.menu.find((x) => x.id === id);
-    if (!m) return;
-    const mods = m.modifiers ? JSON.parse(m.modifiers) : null;
-    modalState = { m, qty: 1, sel: (mods ?? []).map(() => 0) };
-    postEvent("tap", `view item: ${m.name}`);
-    const el = $("#item-modal");
-    el.innerHTML = `
-      ${imgTag(m, "im-img", "im-img-ph")}
-      <button class="im-close" id="im-close">✕</button>
-      <div class="im-body">
-        <div class="im-name">${itemName(m)}</div>
-        <div class="im-desc">${m.description ?? ""}</div>
-        <div class="im-price" id="im-price"></div>
-        ${mods ? `<div class="im-mods">${mods.map((g, gi) => `
-          <div><div class="im-mod-group">${S.lang === "vi" ? g.group : (g.group_en ?? g.group)}</div>
-          <div class="im-mod-opts">${g.options.map((o, oi) => `
-            <button class="im-mod-opt ${oi === 0 ? "sel" : ""}" data-g="${gi}" data-o="${oi}">
-              ${S.lang === "vi" ? o.name : (o.name_en ?? o.name)}${o.delta ? ` +${fmtVND(o.delta)}` : ""}</button>`).join("")}</div></div>`).join("")}</div>` : ""}
-        <div class="im-qtyrow">
-          <button class="im-qbtn" id="im-minus">−</button>
-          <span class="im-qty" id="im-qty">1</span>
-          <button class="im-qbtn" id="im-plus">+</button>
+  function buildSteps() {
+    const steps = [];
+    if (W.comboOpt) steps.push("size");
+    if (modGroups(W.chosen).length) steps.push("customize");
+    steps.push("addon", "review");
+    return steps;
+  }
+
+  function prefetchRecs() {
+    const cart = [...S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty })), { item_id: W.chosen.id, qty: W.qty }];
+    const p = api("/api/recommend", { method: "POST", body: { session_id: KFC.sessionId, cart, trigger: "item_added" } })
+      .then((data) => { if (W) { W.recs = data.items ?? []; } return data; })
+      .catch(() => ({ items: [] }));
+    W.recsPromise = p;
+    postEvent("rec_request", "preemptive: engine warming up while customer customizes");
+  }
+
+  function currentStep() { return W.steps[W.stepIdx]; }
+
+  function renderWizardRail() {
+    const stepLabel = { size: t("step_size"), customize: t("step_customize"), addon: t("step_addon"), review: t("step_review") };
+    $("#wizard-rail").innerHTML =
+      `<button class="rail-btn" data-wz-home>${t("home")}</button>` +
+      W.steps.map((s, i) => `
+        <button class="rail-btn ${i === W.stepIdx ? "active" : i < W.stepIdx ? "done" : ""}"
+          data-wz-step="${i}" ${i > W.stepIdx ? "disabled" : ""}>${stepLabel[s]}</button>`).join("");
+  }
+
+  function buildPrice() {
+    const groups = modGroups(W.chosen);
+    let unit = W.chosen.price;
+    groups.forEach((g, gi) => { unit += g.options[W.mods[gi] ?? 0]?.delta ?? 0; });
+    let total = unit * W.qty;
+    for (const [, a] of W.addons) total += a.item.price * a.qty;
+    return { unit, total };
+  }
+
+  function renderWizard() {
+    renderWizardRail();
+    const step = currentStep();
+    const box = $("#wizard-content");
+    $("#wz-back").textContent = t("back");
+    $("#wz-continue").textContent = t("continue");
+    $("#wz-continue").disabled = false;
+
+    if (step === "size") {
+      const co = W.comboOpt;
+      const flag = co.delta <= 0
+        ? `<span class="sc-flag">${t("save_flag", fmtVND(-co.delta))}</span>`
+        : `<span class="sc-flag pop">✦ ${t("popular_flag")}</span>`;
+      box.innerHTML = `
+        <h2 class="section-title">${t("size_title")}</h2>
+        <p class="section-sub">${itemName(W.base)}</p>
+        <div class="size-cards">
+          <button class="size-card ${W.sizeChoice === "combo" ? "sel" : ""}" data-size="combo">
+            ${flag}<span class="sc-check"></span>
+            ${imgTag(co.combo, "mc-img", "mc-img-ph")}
+            <span class="sc-label">${t("combo_meal")}</span>
+            <span class="sc-desc">${co.combo.description ?? ""}</span>
+            <span class="sc-price">${fmtVND(co.combo.price)}</span>
+          </button>
+          <button class="size-card ${W.sizeChoice === "single" ? "sel" : ""}" data-size="single">
+            <span class="sc-check"></span>
+            ${imgTag(W.base, "mc-img", "mc-img-ph")}
+            <span class="sc-label">${t("item_only")}</span>
+            <span class="sc-desc">${W.base.description ?? ""}</span>
+            <span class="sc-price">${fmtVND(W.base.price)}</span>
+          </button>
+        </div>`;
+    }
+
+    if (step === "customize") {
+      const groups = modGroups(W.chosen);
+      box.innerHTML = `
+        <h2 class="section-title">${t("customize_title")}</h2>
+        <p class="section-sub">${itemName(W.chosen)}</p>
+        ${groups.map((g, gi) => `
+          <div class="cz-group">
+            <div class="cz-title">${S.lang === "vi" ? g.name : (g.name_en ?? g.name)}</div>
+            ${g.options.map((o, oi) => `
+              <button class="cz-opt ${(W.mods[gi] ?? 0) === oi ? "sel" : ""}" data-g="${gi}" data-o="${oi}">
+                <span class="cz-box"></span>
+                ${S.lang === "vi" ? o.name : (o.name_en ?? o.name)}
+                <span class="cz-price">${o.delta ? "+" + fmtVND(o.delta) : ""}</span>
+              </button>`).join("")}
+          </div>`).join("")}`;
+    }
+
+    if (step === "addon") {
+      box.innerHTML = `
+        <h2 class="section-title">${t("addon_title")}</h2>
+        <div class="ao-note"><span class="ai-badge">✦ AI</span> ${t("addon_note")}</div>
+        <div class="addon-grid" id="addon-grid"></div>`;
+      renderAddons();
+    }
+
+    if (step === "review") {
+      const { unit, total } = buildPrice();
+      const groups = modGroups(W.chosen);
+      const custom = groups.map((g, gi) => {
+        const o = g.options[W.mods[gi] ?? 0];
+        return o ? `${S.lang === "vi" ? o.name : (o.name_en ?? o.name)}${o.delta ? ` +${fmtVND(o.delta)}` : ""}` : null;
+      }).filter(Boolean);
+      const addonLines = [...W.addons.values()].map((a) => `${a.qty}× ${itemName(a.item)} +${fmtVND(a.item.price * a.qty)}`);
+      box.innerHTML = `
+        <div class="rv-head">
+          <h2 class="section-title">${t("review_title")}<br /><span style="font-size:2cqw">${itemName(W.chosen)}</span></h2>
+          <span class="rv-price">${fmtVND(total)}</span>
         </div>
-        <button class="im-add" id="im-add"></button>
+        ${imgTag(W.chosen, "rv-img", "mc-img-ph rv-img")}
+        <div class="rv-qtyrow">
+          <button id="rv-minus">−</button><span class="qv">${W.qty}</span><button id="rv-plus">+</button>
+        </div>
+        <div class="rv-custom-title">${t("customizations")}</div>
+        <div class="rv-custom">
+          ${custom.length ? custom.join("<br />") : "—"}
+          ${addonLines.length ? "<br />" + addonLines.join("<br />") : ""}
+        </div>`;
+    }
+  }
+
+  async function renderAddons() {
+    const grid = $("#addon-grid");
+    if (!W.recs) {
+      // rare: engine still working — show the skeleton + storytelling line
+      grid.innerHTML = Array.from({ length: 3 }, () => `<div class="addon-skel"><i></i><b></b><b style="width:55%"></b></div>`).join("") +
+        `<div class="ao-status" id="ao-status">${t("thinking")[0]}</div>`;
+      let i = 0;
+      const timer = setInterval(() => {
+        const el = $("#ao-status");
+        if (!el) { clearInterval(timer); return; }
+        i = (i + 1) % t("thinking").length;
+        el.textContent = t("thinking")[i];
+      }, 900);
+      await W.recsPromise;
+      clearInterval(timer);
+      if (!W || currentStep() !== "addon") return;
+    }
+    const recs = (W.recs ?? []).slice(0, 3);
+    postEvent("rec_shown", `add-on step: ${recs.map((r) => r.name).join(", ")}`);
+    grid.innerHTML = recs.map((r, i) => {
+      const a = W.addons.get(r.id);
+      return `
+      <div class="addon-card ${a ? "picked" : ""}" data-addon="${r.id}" style="animation-delay:${i * 80}ms">
+        ${imgTag(r, "mc-img", "mc-img-ph")}
+        <span class="ao-name">${S.lang === "en" && r.name_en ? r.name_en : r.name}</span>
+        <span class="ao-pitch">${S.lang === "vi" ? r.pitch_vn : r.pitch_en}</span>
+        <span class="ao-price">${r.price_display}</span>
+        <span class="stepper">
+          <button data-step="-1">−</button><span class="qv">${a?.qty ?? 0}</span><button data-step="1">+</button>
+        </span>
       </div>`;
-    $("#item-backdrop").classList.remove("hidden");
-    el.classList.remove("hidden");
-    refreshModalPrice();
+    }).join("") || `<div class="ao-status">—</div>`;
   }
 
-  function modalUnit() {
-    const { m, sel } = modalState;
-    const mods = m.modifiers ? JSON.parse(m.modifiers) : [];
-    let price = m.price;
-    mods.forEach((g, gi) => { price += g.options[sel[gi]]?.delta ?? 0; });
-    return price;
-  }
-  function refreshModalPrice() {
-    const { qty } = modalState;
-    $("#im-price").textContent = fmtVND(modalUnit() * qty);
-    $("#im-qty").textContent = qty;
-    $("#im-add").textContent = `${t("add_to_order")} · ${fmtVND(modalUnit() * qty)}`;
-  }
-  function closeItem() {
-    $("#item-backdrop").classList.add("hidden");
-    $("#item-modal").classList.add("hidden");
-    modalState = null;
+  function wizardContinue() {
+    const step = currentStep();
+    if (step === "size") {
+      const chosen = W.sizeChoice === "combo" ? W.comboOpt.combo : W.base;
+      if (chosen.id !== W.chosen.id) {
+        W.chosen = chosen;
+        W.mods = {};
+        W.steps = buildSteps();
+        prefetchRecs(); // candidate changed — re-warm the engine
+      }
+      observe(`meal size: chose ${W.sizeChoice === "combo" ? `the combo (${W.chosen.name})` : `item only (${W.base.name})`}`);
+    }
+    if (step === "review") { commitWizard(); return; }
+    W.stepIdx += 1;
+    renderWizard();
   }
 
-  // ---------- micro-interactions ----------
-  function flyToCart(sourceEl) {
-    try {
-      const img = sourceEl?.querySelector?.("img, .im-img-ph, .mc-img-ph") ?? sourceEl;
-      if (!img) return;
-      const from = img.getBoundingClientRect();
-      const to = $("#cart-bar").getBoundingClientRect();
-      const kioskBox = $("#kiosk").getBoundingClientRect();
-      const clone = img.cloneNode(true);
-      clone.className = "fly-clone";
-      Object.assign(clone.style, {
-        left: `${from.left - kioskBox.left}px`, top: `${from.top - kioskBox.top}px`,
-        width: `${from.width}px`, height: `${from.height}px`,
-      });
-      $("#fly-layer").appendChild(clone);
-      requestAnimationFrame(() => {
-        Object.assign(clone.style, {
-          left: `${(to.left || kioskBox.left + kioskBox.width / 2) - kioskBox.left + 20}px`,
-          top: `${(to.top || kioskBox.bottom - 80) - kioskBox.top}px`,
-          width: "36px", height: "36px", opacity: ".15", borderRadius: "50%",
-        });
-      });
-      setTimeout(() => clone.remove(), 650);
-    } catch (_) { /* decorative only */ }
-  }
-
-  function bumpCartBar() {
-    const bar = $("#cart-bar");
-    bar.classList.remove("bump");
-    void bar.offsetWidth;
-    bar.classList.add("bump");
-  }
-
-  function launchConfetti() {
-    const box = $("#confetti");
-    box.innerHTML = Array.from({ length: 36 }, (_, i) =>
-      `<i style="left:${Math.random() * 100}%;animation-delay:${Math.random() * .6}s;background:${["#E4002B", "#F2A900", "#2FBF71", "#fff"][i % 4]}"></i>`).join("");
-    setTimeout(() => { box.innerHTML = ""; }, 3200);
+  function commitWizard() {
+    const groups = modGroups(W.chosen);
+    const modNames = groups.map((g, gi) => {
+      const o = g.options[W.mods[gi] ?? 0];
+      return o && (o.delta || (W.mods[gi] ?? 0) > 0) ? o.name : null;
+    }).filter(Boolean);
+    const { unit } = buildPrice();
+    S.cart.push({ item: W.chosen, qty: W.qty, mods: modNames, unit, fromRec: false });
+    const accepted = [];
+    for (const [, a] of W.addons) {
+      S.cart.push({ item: a.item, qty: a.qty, mods: [], unit: a.item.price, fromRec: true });
+      accepted.push(a.item);
+      api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, accepted_item_id: a.item.id } });
+    }
+    if (!accepted.length && W.recs?.length) {
+      api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, dismissed: true } });
+    }
+    postEvent("add_to_cart", `${W.chosen.name} ×${W.qty}${accepted.length ? ` + AI add-ons: ${accepted.map((i) => i.name).join(", ")}` : ""}`);
+    observe(`added ${W.qty}× ${W.chosen.name}${(W.chosen.tags ?? "").includes("sharing") ? " (a sharing/group-size item)" : ""}${accepted.length ? `, ACCEPTED AI add-ons: ${accepted.map((i) => i.name).join(", ")}` : ", no add-ons taken"}, order type: ${S.orderType}`);
+    W = null;
+    renderBottomBar();
+    $("#added-total").textContent = fmtVND(cartSubtotal());
+    show("added");
   }
 
   // ---------- cart ----------
-  function addToCart(m, qty = 1, mods = [], fromRec = false, silent = false) {
-    const existing = S.cart.find((l) => l.item.id === m.id && JSON.stringify(l.mods) === JSON.stringify(mods));
-    if (existing) existing.qty += qty; else S.cart.push({ item: m, qty, mods, fromRec });
-    postEvent("add_to_cart", `${fromRec ? "[AI rec] " : ""}${m.name} ×${qty}`, { id: m.id, fromRec });
-    if (!silent) toast(`✓ ${t("added")}: ${itemName(m)}`);
-    updateCartBar();
-    bumpCartBar();
-  }
-
   function cartSubtotal() {
-    return S.cart.reduce((s, l) => {
-      const mods = l.item.modifiers ? JSON.parse(l.item.modifiers) : [];
-      let unit = l.item.price;
-      l.mods.forEach((sel, gi) => { unit += mods[gi]?.options[sel]?.delta ?? 0; });
-      return s + unit * l.qty;
-    }, 0);
+    return S.cart.reduce((s, l) => s + (l.unit ?? l.item.price) * l.qty, 0);
   }
 
   function voucherDiscount(subtotal) {
@@ -333,33 +450,21 @@
       : S.voucher.kind === "amount" ? S.voucher.value : 0;
   }
 
-  function updateCartBar() {
-    const n = S.cart.reduce((s, l) => s + l.qty, 0);
-    $("#cb-count").textContent = n;
-    $("#cb-total").textContent = fmtVND(cartSubtotal());
-    $("#cart-bar").classList.toggle("hidden", !(n && S.screen === "menu"));
-  }
-
   function renderCart() {
     const lines = $("#cart-lines");
     if (!S.cart.length) {
       lines.innerHTML = `<div class="cart-empty">${t("empty_cart")}</div>`;
     } else {
-      lines.innerHTML = S.cart.map((l, i) => {
-        const mods = l.item.modifiers ? JSON.parse(l.item.modifiers) : [];
-        const modTxt = l.mods.map((sel, gi) => mods[gi]?.options[sel]?.name).filter(Boolean).join(", ");
-        let unit = l.item.price;
-        l.mods.forEach((sel, gi) => { unit += mods[gi]?.options[sel]?.delta ?? 0; });
-        return `<div class="cart-line">
-          <span class="cl-name">${itemName(l.item)}${l.fromRec ? ` <span class="cl-ai">✦ AI</span>` : ""}${modTxt ? `<small>${modTxt}</small>` : ""}</span>
+      lines.innerHTML = S.cart.map((l, i) => `
+        <div class="cart-line">
+          <span class="cl-name">${itemName(l.item)}${l.fromRec ? ` <span class="cl-ai">✦ AI</span>` : ""}${l.mods.length ? `<small>${l.mods.join(", ")}</small>` : ""}</span>
           <span class="cl-qty">
             <button class="cl-qbtn" data-i="${i}" data-d="-1">−</button>
             <span class="cl-q">${l.qty}</span>
             <button class="cl-qbtn" data-i="${i}" data-d="1">+</button>
           </span>
-          <span class="cl-price">${fmtVND(unit * l.qty)}</span>
-        </div>`;
-      }).join("");
+          <span class="cl-price">${fmtVND((l.unit ?? l.item.price) * l.qty)}</span>
+        </div>`).join("");
     }
     renderSummary();
     $("#btn-checkout").disabled = !S.cart.length;
@@ -376,117 +481,28 @@
       <div class="sum-row total"><span>${t("total")}</span><span>${fmtVND(sub - disc)}</span></div>`;
   }
 
-  // ---------- recommendations (P2 + persona) ----------
-  function startThinking() {
-    $("#rec-items").innerHTML = "";
-    $("#rec-thinking").classList.remove("hidden");
-    const lines = t("thinking");
-    let i = 0;
-    const el = $("#rec-status");
-    el.textContent = lines[0];
-    clearInterval(S.thinkTimer);
-    S.thinkTimer = setInterval(() => {
-      i = (i + 1) % lines.length;
-      el.style.opacity = 0;
-      setTimeout(() => { el.textContent = lines[i]; el.style.opacity = 1; }, 180);
-    }, 850);
-  }
-  function stopThinking() {
-    clearInterval(S.thinkTimer);
-    $("#rec-thinking").classList.add("hidden");
-  }
-
-  async function showRecSheet(anchorItem, qty) {
-    // open instantly with the thinking state — the wait IS part of the show
-    $("#rec-backdrop").classList.remove("hidden");
-    $("#rec-sheet").classList.remove("hidden");
-    startThinking();
-    postEvent("rec_request", "kiosk asks rec engine (item added)");
-
-    // 1) tell the profiler what just happened (fast model, sharpens the guess)
-    const sharing = (anchorItem?.tags ?? "").includes("sharing");
-    await observe(`added ${qty}× ${anchorItem?.name ?? "item"}${sharing ? " (a sharing/group-size item)" : ""}, order type: ${S.orderType ?? "?"}`);
-
-    // 2) then ask the engine — it now sees the refreshed hypothesis
-    const cart = S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty }));
-    try {
-      const data = await api("/api/recommend", { method: "POST", body: { session_id: KFC.sessionId, cart, trigger: "item_added" } });
-      const items = (data.items ?? []).slice(0, 3);
-      stopThinking();
-      if (!items.length && !data.smart_swap) { closeRecSheet(false); return; }
-      S.recSheetItems = items;
-      S.pendingSwap = data.smart_swap ?? null;
-      postEvent("rec_shown", `AI suggests: ${items.map((i) => i.name).join(", ")}${data.smart_swap ? ` + swap→${data.smart_swap.name}` : ""}`);
-      $("#rec-items").innerHTML = (data.smart_swap ? swapCardHTML(data.smart_swap) : "") + items.map((r, i) => `
-        <div class="rec-item" style="animation-delay:${i * 90}ms">
-          ${imgTag(r, "ri-img", "ri-img-ph")}
-          <span class="ri-body">
-            <span class="ri-name">${S.lang === "en" && r.name_en ? r.name_en : r.name}</span>
-            <div class="ri-pitch">${S.lang === "vi" ? r.pitch_vn : r.pitch_en}</div>
-            <div class="ri-price">${r.price_display}</div>
-          </span>
-          <button class="ri-add" data-id="${r.id}">+ ${S.lang === "vi" ? "Thêm" : "Add"}</button>
-        </div>`).join("");
-    } catch (_) {
-      stopThinking();
-      closeRecSheet(false);
-    }
-  }
-
-  function closeRecSheet(dismissed) {
-    stopThinking();
-    $("#rec-backdrop").classList.add("hidden");
-    $("#rec-sheet").classList.add("hidden");
-    if (dismissed) {
-      api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, dismissed: true } });
-      observe("dismissed the AI suggestions without adding any");
-      postEvent("rec_dismissed", "customer dismissed AI suggestions");
-    }
-  }
-
   async function loadCartRecs() {
     const cart = S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty }));
-    $("#cart-recs").innerHTML = `<div class="rec-strip-title"><span class="ai-badge">✦ AI</span> <span class="rec-strip-loading">${t("thinking")[0]}</span></div>`;
     try {
       const data = await api("/api/recommend", { method: "POST", body: { session_id: KFC.sessionId, cart, trigger: "cart_review" } });
       const items = (data.items ?? []).slice(0, 3);
       S.pendingSwap = data.smart_swap ?? null;
       if (!items.length && !data.smart_swap) { $("#cart-recs").innerHTML = ""; return; }
-      postEvent("rec_shown", `cart review AI strip: ${items.map((i) => i.name).join(", ")}`);
+      postEvent("rec_shown", `cart review: ${items.map((i) => i.name).join(", ")}${data.smart_swap ? ` + swap→${data.smart_swap.name}` : ""}`);
       $("#cart-recs").innerHTML = `
         ${data.smart_swap ? `<div class="swap-banner">
-          <span class="swap-tag">💛 ${data.smart_swap.delta < 0 ? (S.lang === "vi" ? "TIẾT KIỆM " + fmtVND(-data.smart_swap.delta) : "SAVE " + fmtVND(-data.smart_swap.delta)) : data.smart_swap.delta_display}</span>
+          <span class="swap-tag">💚 ${data.smart_swap.delta < 0 ? t("swap_save", fmtVND(-data.smart_swap.delta)) : t("swap_more", data.smart_swap.delta_display)}</span>
           <span class="swap-msg">${S.lang === "vi" ? data.smart_swap.message_vn : data.smart_swap.message_en}</span>
-          <button class="ri-add swap-accept">↻ ${S.lang === "vi" ? "Đổi" : "Swap"}</button>
+          <button class="swap-accept">↻ ${t("swap_btn")}</button>
         </div>` : ""}
-        <div class="rec-strip-title"><span class="ai-badge">✦ AI</span> ${t("rec_title")}</div>
+        ${items.length ? `<div class="rec-strip-title"><span class="ai-badge">✦ AI</span> ${t("rec_title")}</div>
         <div class="rec-strip">${items.map((r) => `
           <button class="rs-card" data-id="${r.id}">
             <div class="rs-name">${S.lang === "en" && r.name_en ? r.name_en : r.name}</div>
             <div class="rs-pitch">${S.lang === "vi" ? r.pitch_vn : r.pitch_en}</div>
             <div class="rs-price">+ ${r.price_display}</div>
-          </button>`).join("")}</div>`;
-      S.recSheetItems = items;
+          </button>`).join("")}</div>` : ""}`;
     } catch (_) { $("#cart-recs").innerHTML = ""; }
-  }
-
-  // kindness-first: money-saving combo swap card (trust before upsell)
-  function swapCardHTML(sw) {
-    const msg = S.lang === "vi" ? sw.message_vn : sw.message_en;
-    const saveTag = sw.delta < 0
-      ? (S.lang === "vi" ? `TIẾT KIỆM ${fmtVND(-sw.delta)}` : `SAVE ${fmtVND(-sw.delta)}`)
-      : (S.lang === "vi" ? `THÊM MÓN ${sw.delta_display}` : `MORE FOOD ${sw.delta_display}`);
-    return `
-      <div class="rec-item swap-item">
-        <span class="swap-tag">💛 ${saveTag}</span>
-        ${imgTag(sw, "ri-img", "ri-img-ph")}
-        <span class="ri-body">
-          <span class="ri-name">${S.lang === "en" && sw.name_en ? sw.name_en : sw.name}</span>
-          <div class="ri-pitch">${msg}</div>
-          <div class="ri-price">${sw.price_display}</div>
-        </span>
-        <button class="ri-add swap-accept">↻ ${S.lang === "vi" ? "Đổi" : "Swap"}</button>
-      </div>`;
   }
 
   function performSwap() {
@@ -500,23 +516,26 @@
       }
     }
     const combo = S.menu.find((x) => x.id === sw.id);
-    if (combo) addToCart(combo, 1, [], true);
+    if (combo) S.cart.push({ item: combo, qty: 1, mods: [], unit: combo.price, fromRec: true });
     api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, accepted_item_id: sw.id } });
     observe(`accepted the money-saving combo swap to ${sw.name} (trusts the assistant)`);
     postEvent("rec_accepted", `kindness-first swap accepted: ${sw.name} (${sw.delta_display})`, { id: sw.id });
-    toast(sw.delta < 0 ? `💛 ${S.lang === "vi" ? "Đã tiết kiệm" : "Saved"} ${fmtVND(-sw.delta)}!` : `✓ ${t("added")}: ${sw.name}`);
+    toast(sw.delta < 0 ? `💚 ${S.lang === "vi" ? "Đã tiết kiệm" : "Saved"} ${fmtVND(-sw.delta)}!` : `✓ ${t("added")}: ${sw.name}`);
     S.pendingSwap = null;
-    if (S.screen === "cart") renderCart();
+    renderBottomBar();
+    renderCart();
   }
 
-  function acceptRec(id) {
+  function acceptStripRec(id) {
     const m = S.menu.find((x) => x.id === id);
     if (!m) return;
-    addToCart(m, 1, (m.modifiers ? JSON.parse(m.modifiers) : []).map(() => 0), true);
+    S.cart.push({ item: m, qty: 1, mods: [], unit: m.price, fromRec: true });
     api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, accepted_item_id: id } });
     observe(`ACCEPTED the AI suggestion: ${m.name} (${m.category})`);
     postEvent("rec_accepted", `customer accepted AI rec: ${m.name}`, { id });
-    if (S.screen === "cart") renderCart();
+    toast(`✓ ${t("added")}: ${itemName(m)}`);
+    renderBottomBar();
+    renderCart();
   }
 
   // ---------- checkout ----------
@@ -527,15 +546,9 @@
       $("#qr-box").innerHTML = Array.from({ length: 169 }, () => (Math.random() > .5 ? "<i></i>" : "<span></span>")).join("");
     }
     postEvent("payment", `payment method: ${method}`);
-    await new Promise((r) => setTimeout(r, 2200)); // simulated PSP roundtrip
+    await new Promise((r) => setTimeout(r, 2200));
 
-    const items = S.cart.map((l) => {
-      const mods = l.item.modifiers ? JSON.parse(l.item.modifiers) : [];
-      return {
-        item_id: l.item.id, quantity: l.qty,
-        modifiers: l.mods.map((sel, gi) => mods[gi]?.options[sel]?.name).filter(Boolean),
-      };
-    });
+    const items = S.cart.map((l) => ({ item_id: l.item.id, quantity: l.qty, modifiers: l.mods }));
     const recIds = S.cart.filter((l) => l.fromRec).map((l) => l.item.id);
     const out = await api("/api/order", {
       method: "POST",
@@ -549,7 +562,7 @@
     renderConfirm();
     show("confirm");
     S.cart = []; S.voucher = null;
-    updateCartBar();
+    renderBottomBar();
     pollOrderStatus();
   }
 
@@ -581,80 +594,109 @@
     }, 3000);
   }
 
+  function launchConfetti() {
+    const box = $("#confetti");
+    box.innerHTML = Array.from({ length: 32 }, (_, i) =>
+      `<i style="left:${Math.random() * 100}%;animation-delay:${Math.random() * .6}s;background:${["#E4002B", "#F2A900", "#21A038", "#1F1F1F"][i % 4]}"></i>`).join("");
+    setTimeout(() => { box.innerHTML = ""; }, 3200);
+  }
+
   // ---------- events ----------
   document.addEventListener("click", (ev) => {
     const btn = ev.target.closest("button");
     if (!btn) return;
+
     if (btn.id === "btn-start") {
-      KFC.rotateSession();               // new customer, new hypothesis
-      S.orderType = null; S.cart = []; S.voucher = null; S.loyalty = null;
-      updateCartBar();
-      $("#vf-content").innerHTML = `<span class="vf-icon">📷</span><span class="vf-hint">${t("camera_hint")}</span>`;
-      $("#viewfinder").classList.remove("scanning", "done");
-      $("#camera-status").textContent = "";
-      $("#camera-input").value = "";
-      postEvent("session_start", "new customer session");
-      show("camera");
+      KFC.rotateSession();  // new customer, fresh (background) hypothesis
+      S.orderType = null; S.cart = []; S.voucher = null; S.loyalty = null; W = null;
+      postEvent("session_start", "new customer session (background profiling active)");
+      renderBottomBar();
+      show("ordertype");
     }
-    else if (btn.id === "btn-camera-skip") { observe("skipped the camera check-in"); show("ordertype"); }
     else if (btn.classList.contains("ordertype-card")) {
       S.orderType = btn.dataset.type;
       postEvent("tap", `order type: ${S.orderType}`);
       observe(`chose order type: ${S.orderType}`);
       show("menu");
     }
-    else if (btn.classList.contains("cat-btn")) { S.activeCat = btn.dataset.cat; renderCats(); renderGrid(); postEvent("tap", `category: ${btn.dataset.cat}`); }
-    else if (btn.classList.contains("menu-card")) openItem(Number(btn.dataset.id));
-    else if (btn.id === "im-close") closeItem();
-    else if (btn.id === "im-minus") { modalState.qty = Math.max(1, modalState.qty - 1); refreshModalPrice(); }
-    else if (btn.id === "im-plus") { modalState.qty += 1; refreshModalPrice(); }
-    else if (btn.classList.contains("im-mod-opt")) {
-      modalState.sel[Number(btn.dataset.g)] = Number(btn.dataset.o);
-      $$(`.im-mod-opt[data-g="${btn.dataset.g}"]`).forEach((b) => b.classList.remove("sel"));
-      btn.classList.add("sel");
-      refreshModalPrice();
+    else if (btn.dataset.cat) { S.activeCat = btn.dataset.cat; renderMenuRail(); renderGrid(); postEvent("tap", `category: ${btn.dataset.cat}`); }
+    else if (btn.hasAttribute("data-home") || btn.id === "btn-home") {
+      if (S.screen !== "attract") { W = null; show(S.screen === "menu" ? "attract" : "menu"); }
     }
-    else if (btn.id === "im-add") {
-      const { m, qty, sel } = modalState;
-      flyToCart($("#item-modal"));
-      addToCart(m, qty, sel);
-      closeItem();
-      showRecSheet(m, qty);
+    else if (btn.classList.contains("menu-card")) {
+      const m = S.menu.find((x) => x.id === Number(btn.dataset.id));
+      if (m) startWizard(m);
     }
-    else if (btn.id === "rec-close" || btn.id === "rec-skip") closeRecSheet(true);
-    else if (btn.classList.contains("swap-accept")) { performSwap(); closeRecSheet(false); }
-    else if (btn.classList.contains("ri-add") || btn.classList.contains("rs-card")) {
-      acceptRec(Number(btn.dataset.id));
-      if (btn.classList.contains("ri-add")) closeRecSheet(false);
+    // wizard
+    else if (btn.hasAttribute("data-wz-home")) { W = null; show("menu"); }
+    else if (btn.dataset.wzStep !== undefined) {
+      const i = Number(btn.dataset.wzStep);
+      if (i <= W.stepIdx) { W.stepIdx = i; renderWizard(); }
     }
-    else if (btn.id === "cart-bar") show("cart");
+    else if (btn.dataset.size) {
+      W.sizeChoice = btn.dataset.size;
+      renderWizard();
+    }
+    else if (btn.dataset.g !== undefined && S.screen === "wizard") {
+      W.mods[Number(btn.dataset.g)] = Number(btn.dataset.o);
+      renderWizard();
+    }
+    else if (btn.dataset.step && btn.closest(".addon-card")) {
+      const card = btn.closest(".addon-card");
+      const id = Number(card.dataset.addon);
+      const rec = (W.recs ?? []).find((r) => r.id === id);
+      const item = S.menu.find((x) => x.id === id);
+      if (!item) return;
+      const cur = W.addons.get(id)?.qty ?? 0;
+      const next = Math.max(0, cur + Number(btn.dataset.step));
+      if (next === 0) W.addons.delete(id);
+      else W.addons.set(id, { item, qty: next, pitch: rec?.pitch_vn });
+      renderWizard();
+    }
+    else if (btn.id === "wz-back") {
+      if (W.stepIdx === 0) { W = null; show("menu"); }
+      else { W.stepIdx -= 1; renderWizard(); }
+    }
+    else if (btn.id === "wz-continue") wizardContinue();
+    else if (btn.id === "rv-minus") { W.qty = Math.max(1, W.qty - 1); renderWizard(); }
+    else if (btn.id === "rv-plus") { W.qty += 1; renderWizard(); }
+    // added interstitial
+    else if (btn.id === "btn-continue-ordering") show("menu");
+    else if (btn.id === "btn-complete-order") show("cart");
+    // menu bottom bar
+    else if (btn.id === "bb-cancel") { S.cart = []; renderBottomBar(); show("attract"); }
+    else if (btn.id === "bb-cart") show("cart");
+    else if (btn.id === "bb-pay") show("cart");
+    // basket
+    else if (btn.classList.contains("swap-accept")) performSwap();
+    else if (btn.classList.contains("rs-card")) acceptStripRec(Number(btn.dataset.id));
     else if (btn.id === "btn-back-menu") show("menu");
-    else if (btn.id === "btn-checkout") { $("#pay-total").textContent = fmtVND(cartSubtotal() - voucherDiscount(cartSubtotal())); $("#pay-methods").classList.remove("hidden"); $("#pay-qr").classList.add("hidden"); show("payment"); }
+    else if (btn.id === "btn-checkout") {
+      $("#pay-total").textContent = fmtVND(cartSubtotal() - voucherDiscount(cartSubtotal()));
+      $("#pay-methods").classList.remove("hidden");
+      $("#pay-qr").classList.add("hidden");
+      show("payment");
+    }
     else if (btn.classList.contains("pay-card")) placeOrder(btn.dataset.method);
     else if (btn.id === "btn-back-cart") show("cart");
     else if (btn.id === "btn-new-order") show("attract");
-    else if (btn.id === "btn-home") { if (S.screen !== "attract") show(S.cart.length ? "menu" : "attract"); }
-    else if (btn.id === "btn-lang") { S.lang = S.lang === "vi" ? "en" : "vi"; applyI18n(); renderCats(); renderGrid(); renderDaypartBanner(); if (S.screen === "cart") renderCart(); postEvent("tap", `language → ${S.lang}`); }
+    else if (btn.id === "btn-lang") {
+      S.lang = S.lang === "vi" ? "en" : "vi";
+      applyI18n(); renderContextStrip(); renderMenuRail(); renderGrid(); renderBottomBar();
+      if (S.screen === "wizard" && W) renderWizard();
+      if (S.screen === "cart") renderCart();
+      postEvent("tap", `language → ${S.lang}`);
+    }
     else if (btn.id === "btn-voucher") applyVoucherUI();
     else if (btn.id === "btn-loyalty") checkLoyaltyUI();
-  });
-
-  $("#camera-input").addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (file) handlePhoto(file).catch(() => show("ordertype"));
-  });
-  $("#item-backdrop").addEventListener("click", closeItem);
-  $("#rec-backdrop").addEventListener("click", () => closeRecSheet(true));
-
-  document.addEventListener("click", (ev) => {
-    const qbtn = ev.target.closest(".cl-qbtn");
-    if (!qbtn) return;
-    const line = S.cart[Number(qbtn.dataset.i)];
-    if (!line) return;
-    line.qty += Number(qbtn.dataset.d);
-    if (line.qty <= 0) S.cart.splice(Number(qbtn.dataset.i), 1);
-    updateCartBar();
-    renderCart();
+    else if (btn.classList.contains("cl-qbtn")) {
+      const line = S.cart[Number(btn.dataset.i)];
+      if (!line) return;
+      line.qty += Number(btn.dataset.d);
+      if (line.qty <= 0) S.cart.splice(Number(btn.dataset.i), 1);
+      renderBottomBar();
+      renderCart();
+    }
   });
 
   async function applyVoucherUI() {
@@ -665,10 +707,9 @@
     const p = S.promos.find((x) => x.code.toUpperCase() === code);
     if (p && p.applies_now && p.min_order <= sub && ["percent", "amount"].includes(p.kind)) {
       S.voucher = p;
-      const d = voucherDiscount(sub);
       msg.className = "extra-msg ok";
-      msg.textContent = "✓ " + t("voucher_ok", p.code, fmtVND(d));
-      postEvent("voucher", `voucher ${p.code} applied (−${fmtVND(d)})`);
+      msg.textContent = "✓ " + t("voucher_ok", p.code, fmtVND(voucherDiscount(sub)));
+      postEvent("voucher", `voucher ${p.code} applied`);
     } else {
       S.voucher = null;
       msg.className = "extra-msg err";
@@ -695,7 +736,7 @@
     }
   }
 
-  // scenario director (desktop view) nudges us to reload context
+  // scenario director / camera-frame injection nudge from the ops view
   window.addEventListener("message", (ev) => {
     if (ev.data?.kfcScenario) { loadMenu().catch(() => {}); if (S.screen === "cart") renderCart(); }
   });
@@ -703,6 +744,6 @@
   // ---------- boot ----------
   applyI18n();
   show("attract");
-  loadMenu().catch((err) => toast("⚠ menu load failed: " + err));
-  postEvent("boot", "kiosk booted");
+  loadMenu().catch((err) => toast("⚠ menu: " + err));
+  postEvent("boot", "kiosk booted (v3 native journey)");
 })();

@@ -8,23 +8,28 @@
 > order value is being left on the table. We built the agentic layer that captures it —
 > and you can watch it think, live, on this diagram."
 
-## 0:20 — The profiler: AI guesses the customer (55s)
-Tap start → **camera check-in** → upload the prepared photo (business suit / mom-with-kids).
-- Point right: the **CUSTOMER HYPOTHESIS panel** fills — "Office worker on a quick lunch
-  break", confidence bar, category-bias bars.
-- Order dine-in, add a chicken piece → the hypothesis **updates live** from behavior alone:
-  "…alone, hungry, wants something quick" — evidence trail visible.
-- Say: "It never assumes — a vision glance gives coarse hints, and every tap revises the
-  guess. Watch the confidence climb as evidence agrees."
+## 0:20 — The invisible profiler (50s)
+Tap start → dine-in → menu. Point at the kiosk: "This is the exact journey KFC customers
+already know — nothing new to learn." Then click **📷 inject camera frame** on the ops panel
+(the stand-in for the store camera) with the prepared photo.
+- The **CUSTOMER HYPOTHESIS panel** fills — "likely a parent with a child", confidence,
+  bias bars — while **the kiosk shows nothing**.
+- Open a burger → the hypothesis updates live from behavior alone; the event stream reads
+  "preemptive: engine warming up while customer customizes."
+- Say: "It guesses, never assumes — a background glance plus every tap. Invisible to the
+  customer, visible to us."
 
-## 1:15 — Kindness first, then the upsell (65s)
-Add a **Pepsi separately** → the golden sheet opens with the AI visibly thinking
-("đang xem đơn tương tự… đang kiểm tra bếp…"), then leads with the **green swap card**:
-- "Mẹo nhỏ nè: đổi sang Combo — vẫn đủ món bạn chọn mà **tiết kiệm 13.000₫**."
-- Say: "Trust first. The AI takes money OFF the bill when a combo covers what you picked —
-  like a staff member who's genuinely on your side. THEN it upsells — and acceptance goes up."
-- Tap the swap, then accept the persona-matched dessert rec → REC ACCEPT ticks.
-- Note the combo-awareness: "it will never offer a cola when your combo already has one."
+## 1:10 — The native journey, AI inside it (70s)
+Walk the meal builder exactly like the real kiosk:
+- **MEAL SIZE**: combo pre-marked with the honest green flag "TIẾT KIỆM 5.000₫" —
+  "kindness first: it takes money OFF when the combo wins."
+- **CUSTOMIZE**: soda flavor / extras / upsize — standard.
+- **ADD ON ("Thêm chút gì nhé!")**: "this screen exists on every KFC kiosk — the only
+  difference is *the AI now picks what's on it*, per store, per hour, per customer, with
+  real attach-rate pitches. And it was computed before we arrived — zero wait."
+  Add the dessert it suggests → REVIEW → green check "Đã thêm vào giỏ!"
+- In the basket: the swap banner if items were picked separately; "it never suggests a cola
+  when your combo already includes one."
 
 ## 2:20 — Scenario director + the business case (40s)
 Click **🎬 Scenario** on the desktop view → tap "Tối T7 ở TTTM" preset:

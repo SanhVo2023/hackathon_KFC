@@ -185,7 +185,15 @@ for (const item of catalog) {
     key.split(" ").filter((w) => w.length > 3).every((w) => m.key.includes(w)));
   if (hit) { item.image_url = hit.url; filled++; }
 }
-console.log(`image backfill: ${filled} curated items matched from crawl (${imageMap.length} crawled images)`);
+// Gemini-generated product shots (seed/gen-images.mjs) fill the last gaps
+let genFilled = 0;
+for (const item of catalog) {
+  if (!item.image_url && existsSync(join(here, "..", "public", "img", `item-${item.id}.jpg`))) {
+    item.image_url = `/img/item-${item.id}.jpg`;
+    genFilled++;
+  }
+}
+console.log(`image backfill: ${filled} matched from crawl (${imageMap.length} crawled), ${genFilled} AI-generated`);
 
 // combo contents: which categories a combo already includes (so the engine
 // never recommends a cola on top of a combo that has one)

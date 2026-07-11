@@ -25,16 +25,27 @@
 
 ## What we built
 
-### 0. Customer hypothesis agent — "guess, never assume"
-At session start the kiosk takes one camera glance (demo: photo upload) — a **vision model**
-(llama-3.2-11b-vision, llava fallback) extracts only coarse, non-identifying attributes
-(age band, attire, group, context). Then **every interaction** — order type, a 4-person
-bucket, a dismissed suggestion — feeds **llama-3.1-8b-fast** (~1.3s) which continuously
-revises a persona hypothesis with category biases and a confidence score. A woman in casual
-clothes buying a 4-person wings combo → "likely a family" → dessert bias up. A man in a suit
-at noon → "office worker on a lunch break" → quick-drink bias up. The hypothesis is the
-engine's 8th signal and is shown live (photo, persona, evidence trail, bias bars) on the
-desktop ops view. Privacy by construction: no identity, no photo storage beyond the demo thumb.
+### 0. Customer hypothesis agent — "guess, never assume", fully invisible
+The kiosk shows **nothing** about profiling — the customer sees only the journey they already
+know. In the background, a store-camera frame (demo: injected from the ops view) passes through
+a **vision model** (llama-3.2-11b-vision, llava fallback) that extracts only coarse,
+non-identifying attributes (age band, attire, group, context). Then **every interaction** —
+order type, a 4-person bucket, a dismissed suggestion — feeds **llama-3.1-8b-fast** (~1.3s,
+never blocking the UI) which continuously revises a persona hypothesis with category biases
+and a confidence score. A woman in casual clothes buying a 4-person wings combo → "likely a
+family" → dessert bias up. A man in a suit at noon → "office worker on a lunch break" →
+quick-drink bias up. The hypothesis is the engine's 8th signal, shown live (persona, evidence
+trail, bias bars) on the ops view. Privacy by construction: no identity, no photo storage.
+
+### 0a. The journey customers already know — AI inside it, not on top of it
+KFC runs these kiosks across hundreds of restaurants; the flow must never re-educate users.
+The kiosk reproduces the standard KFC meal-builder exactly — menu → **MEAL SIZE** (combo vs
+item only) → **CUSTOMIZE** (soda flavor, extras, upsize) → **ADD ON** ("Let's top it up!") →
+**REVIEW** → green "added to basket". The AI lives *inside* those native steps: MEAL SIZE
+shows the honest money-saving flag on the combo option, and the ADD ON grid is simply
+*populated by the rec engine*, with data-driven pitch lines. **Preemptive by design:** the
+engine and profiler start working the moment an item is opened, so when the customer reaches
+ADD ON the suggestions are already rendered — zero added wait in an intensely time-pressed flow.
 
 ### 0b. Kindness first — trust before upsell
 If the customer builds a combo by hand (wings + Pepsi + fries as separate items), the engine
@@ -102,8 +113,10 @@ LLM pitch on/off, slots), menu 86-ing, promotion toggles, live event log. All Vi
 
 ## Data — crawled + synthetic
 - **Menu:** real KFC Vietnam items, prices and official images, crawled from
-  kfcvietnam.com.vn with **TinyFish** (`tinyfish agent run`, output in `seed/crawl-menu.json`,
-  run id `7305956e`), merged with a curated catalog for category coverage → 48 items.
+  kfcvietnam.com.vn with **TinyFish** (two agent runs: items+prices, then a 92-image sweep),
+  merged with a curated catalog for category coverage → 48 items. The last 10 missing product
+  photos were generated with **Gemini (gemini-2.5-flash-image)** in KFC menu-board style
+  (`seed/gen-images.mjs`, key via env only).
 - **POS history:** 9,000 synthetic transactions over 90 days across 6 stores in 4 site
   clusters, with cluster-specific daypart/basket archetypes → precomputed co-occurrence and
   popularity per cluster × daypart. Per-store inventory (stock vs par level) + holiday calendar.

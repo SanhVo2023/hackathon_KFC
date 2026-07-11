@@ -207,3 +207,12 @@
 .sd-inv button:hover { border-color: var(--warn); }
 .sd-apply { background: var(--kfc-red); color: #fff; border: 0; border-radius: .5vw; padding: .65vw; font-size: .85vw; font-weight: 800; cursor: pointer; margin-top: .4vw; }
 .sd-clear { background: none; border: 1px solid var(--ops-line); color: var(--ops-dim); border-radius: .5vw; padding: .5vw; font-size: .75vw; cursor: pointer; }
+
+/* camera frame injection control */
+.pt-right { display: flex; align-items: center; gap: .8vw; }
+.pf-inject {
+  background: var(--ops-panel-2); border: 1px solid var(--ai-gold); color: var(--ai-gold);
+  border-radius: 99px; padding: .18vw .7vw; font-size: .66vw; font-weight: 700;
+  cursor: pointer; text-transform: none; letter-spacing: .02em; white-space: nowrap;
+}
+.pf-inject:hover { background: rgba(242,169,0,.12); }

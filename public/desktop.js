@@ -217,6 +217,37 @@
   refreshStats();
   setInterval(refreshStats, 5000);
 
+  // ---------- camera frame injection (demo stand-in for the store camera) ----------
+  // In production a ceiling camera snaps a frame when a session starts; here the
+  // operator injects one. The kiosk never shows anything — profiling is invisible.
+  $("#pf-file").addEventListener("change", async (ev) => {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    const toDataUrl = (img, max) => {
+      const r = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      return c.toDataURL("image/jpeg", .75);
+    };
+    const img = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = reader.result; };
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+    // the kiosk iframe is same-origin: read the live customer session directly
+    let sessionId = null;
+    try { sessionId = $("#kiosk-frame").contentWindow.KFC.sessionId; } catch (_) { /* standalone */ }
+    if (!sessionId) return;
+    glow("profiler"); pulse("kiosk", "profiler", "");
+    await api("/api/profile/photo", {
+      method: "POST",
+      body: { session_id: sessionId, image: toDataUrl(img, 512), thumb: toDataUrl(img, 120) },
+    }).catch(() => null);
+    ev.target.value = "";
+  });
+
   // ---------- scenario director ----------
   const PRESETS = [
     { key: "office-lunch", icon: "🏢", title: "Trưa văn phòng", sub: "Landmark 81 · T3 · 12:00",
