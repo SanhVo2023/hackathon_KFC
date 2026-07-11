@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>KFC Kiosk Agent — Pitch Deck</title>
+<title>KFC Kiosk Agent — Pitch Deck (5-min frame)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root { --red:#E4002B; --red-dark:#7A0013; --ink:#0E1116; --panel:#151A22; --line:#242B38; --gold:#F2A900; --green:#3FB68B; --dim:#8B93A3; }
@@ -10,214 +10,171 @@
   body { background:#000; font-family:'Segoe UI', Arial, sans-serif; }
   .slide {
     width:100vw; height:100vh; position:relative; overflow:hidden;
-    background:var(--ink); color:#fff; padding:64px 84px 64px 110px;
-    display:flex; flex-direction:column; justify-content:center; gap:26px;
+    background:var(--ink); color:#fff; padding:56px 80px 56px 108px;
+    display:flex; flex-direction:column; justify-content:center; gap:24px;
     page-break-after:always;
   }
   .slide::before { content:""; position:absolute; inset:0 auto 0 0; width:26px;
     background:repeating-linear-gradient(180deg, var(--red) 0 80px, #fff 80px 160px); }
+  .tag { position:absolute; top:30px; right:44px; font-size:15px; font-weight:800; letter-spacing:.18em; color:var(--dim); text-transform:uppercase; }
   .kicker { font-size:19px; font-weight:800; letter-spacing:.24em; text-transform:uppercase; color:var(--gold); }
-  h1 { font-size:76px; font-weight:900; letter-spacing:-.02em; line-height:1.02; }
-  h2 { font-size:52px; font-weight:900; letter-spacing:-.02em; line-height:1.05; }
+  h1 { font-size:74px; font-weight:900; letter-spacing:-.02em; line-height:1.02; }
+  h2 { font-size:50px; font-weight:900; letter-spacing:-.02em; line-height:1.05; }
   p, li { font-size:23px; color:#C7CBD4; line-height:1.5; }
   b { color:#fff; }
   .num { font-weight:900; color:var(--gold); }
-  .cols { display:flex; gap:44px; align-items:center; }
+  .cols { display:flex; gap:40px; align-items:center; }
   .cols > div { flex:1; min-width:0; }
-  .shot { border-radius:14px; border:1px solid var(--line); box-shadow:0 24px 70px rgba(0,0,0,.5); max-width:100%; max-height:62vh; }
+  .shot { border-radius:14px; border:1px solid var(--line); box-shadow:0 24px 70px rgba(0,0,0,.5); max-width:100%; max-height:58vh; }
   .chip { display:inline-block; background:var(--panel); border:1px solid var(--gold); color:var(--gold);
-    border-radius:999px; padding:4px 16px; font-size:17px; font-weight:800; margin:0 8px 8px 0; }
+    border-radius:999px; padding:4px 15px; font-size:17px; font-weight:800; margin:0 8px 8px 0; }
   .chip.g { border-color:var(--green); color:var(--green); }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px 26px; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
-  .foot { position:absolute; bottom:26px; right:44px; font-size:15px; color:var(--dim); }
-  ul { list-style:none; display:flex; flex-direction:column; gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px 24px; }
+  .foot { position:absolute; bottom:24px; right:44px; font-size:15px; color:var(--dim); }
+  ul { list-style:none; display:flex; flex-direction:column; gap:11px; }
   li::before { content:"—"; color:var(--red); font-weight:900; margin-right:12px; }
-  code { font-family:Consolas, monospace; color:var(--gold); font-size:21px; }
+  /* agentic workflow flow */
+  .flow { display:grid; grid-template-columns:repeat(5, 1fr); gap:14px; }
+  .step { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 16px 14px; position:relative; }
+  .step::after { content:"→"; position:absolute; right:-15px; top:42%; color:var(--red); font-size:24px; font-weight:900; z-index:2; }
+  .step:last-child::after { content:""; }
+  .step h3 { font-size:23px; font-weight:900; color:var(--gold); margin-bottom:8px; }
+  .step p { font-size:16.5px; line-height:1.45; }
+  .step small { display:block; margin-top:8px; font-size:13.5px; color:var(--dim); font-family:Consolas,monospace; }
   @media print {
-    .slide { width:297mm; height:167mm; padding:34px 44px 34px 60px; }
-    h1{font-size:52px} h2{font-size:36px} p,li{font-size:16px} .kicker{font-size:13px}
-    .shot{max-height:100mm} .cost-big{font-size:60px!important}
+    .slide { width:297mm; height:167mm; padding:30px 40px 30px 56px; }
+    h1{font-size:50px} h2{font-size:34px} p,li{font-size:15px} .kicker{font-size:13px}
+    .shot{max-height:95mm} .step p{font-size:11px} .step h3{font-size:15px} .step small{font-size:9px}
+    .big{font-size:56px!important}
   }
 </style>
 </head>
 <body>
 
-<!-- 1 · TITLE -->
+<!-- SLIDE 1 · TEAM + PROMISE (0:00–0:45) -->
 <section class="slide" style="background:radial-gradient(1200px 720px at 50% 15%, #FF2E4E 0%, var(--red) 45%, var(--red-dark) 100%); align-items:center; text-align:center;">
-  <img src="public/brand/kfc-logo-white.png" style="width:330px; filter:drop-shadow(0 14px 40px rgba(0,0,0,.5));" />
-  <h1>A kiosk with a<br/>salesperson’s brain</h1>
-  <p style="color:rgba(255,255,255,.94); font-size:27px; font-weight:700;">Agentic AI Build Week 2026 · F&amp;B Track · KFC Vietnam · Problems P2 + P4</p>
-  <p style="color:#fff; font-weight:800; font-size:23px; background:rgba(0,0,0,.35); padding:10px 30px; border-radius:999px;">🔴 LIVE: kfc-kiosk-agent.gentle-sky-3b0e.workers.dev</p>
+  <div class="tag" style="color:rgba(255,255,255,.7);">1 · Team + Promise</div>
+  <img src="public/brand/kfc-logo-white.png" style="width:300px; filter:drop-shadow(0 14px 40px rgba(0,0,0,.5));" />
+  <h1>KFC Kiosk Agent</h1>
+  <p style="color:#fff; font-size:34px; font-weight:800; max-width:1300px;">An agent that sells like your best staff member — it raises order value <u>by earning trust first</u>, for 13₫ of AI per customer.</p>
+  <p style="color:rgba(255,255,255,.92); font-size:24px; font-weight:700;">MatViet Design Team · Agentic AI Build Week 2026 · F&amp;B Track (KFC · P2 + P4)</p>
+  <p style="color:#fff; font-weight:800; font-size:21px; background:rgba(0,0,0,.35); padding:10px 28px; border-radius:999px;">🔴 LIVE: kfc-kiosk-agent.gentle-sky-3b0e.workers.dev</p>
 </section>
 
-<!-- 2 · PROBLEM -->
+<!-- SLIDE 2 · PROBLEM INSIGHT (0:45–1:30) -->
 <section class="slide">
-  <div class="kicker">The problem — from KFC’s own brief</div>
-  <h2>250+ stores. One static menu.</h2>
-  <ul style="font-size:30px;">
-    <li><b>“You may also like”</b> is hand-picked by marketing, <b>once a month</b>, the same for every store.</li>
-    <li>Office tower at noon and mall on Saturday night get <b>identical suggestions</b>.</li>
-    <li>KFC’s estimate: <span class="num">15–20% of order value</span> left on the table.</li>
-    <li>P2 target: <span class="num">+10–15% AOV</span> from contextual recommendations · P4: conversational ordering + human handoff.</li>
+  <div class="tag">2 · Problem Insight</div>
+  <div class="kicker">Who has the problem — and what we learned</div>
+  <h2>250+ KFC kiosks show everyone the same menu</h2>
+  <ul style="font-size:27px;">
+    <li>The “you may also like” box is <b>hand-picked by marketing, once a month</b> — identical for an office tower at noon and a mall on Saturday night.</li>
+    <li>KFC’s own estimate: <span class="num">15–20% of order value</span> is left on the table (target: +10–15% AOV).</li>
   </ul>
-  <div class="card" style="border-color:var(--gold);"><p><b>Our added constraint:</b> the upsell must feel like a good salesperson, not a slot machine.
-  Customer time at a kiosk is intense — <b>trust is the only durable growth lever</b>.</p></div>
-  <div class="foot">KFC Kiosk Agent · AABW 2026</div>
+  <div class="cols">
+    <div class="card" style="border-color:var(--gold);">
+      <p><b>Learning #1 — from the data:</b> 250 stores are not one store. Basket patterns split hard by site type (mall / office / residential / tourist), hour, holiday and live inventory.</p>
+    </div>
+    <div class="card" style="border-color:var(--green);">
+      <p><b>Learning #2 — from psychology:</b> kiosk upsell fails when it feels like a slot machine. Customers are time-pressed; <b>trust is the only durable growth lever</b> — so the agent saves them money before it sells.</p>
+    </div>
+  </div>
+  <div class="foot">Sources: KFC Vietnam track brief · menu-engineering & QSR-margin literature · 9,000-basket POS simulation</div>
 </section>
 
-<!-- 3 · WHAT WE BUILT -->
+<!-- SLIDE 3 · AGENTIC WORKFLOW (1:30–2:30) -->
 <section class="slide">
-  <div class="kicker">What we built</div>
-  <h2>Two agents, one deterministic brain — fully observable</h2>
+  <div class="tag">3 · Agentic Workflow</div>
+  <div class="kicker">Not a chatbot — it senses, decides and acts on its own</div>
+  <h2>Goal → Plan → Tools → Act → Verify</h2>
+  <div class="flow">
+    <div class="step"><h3>🎯 Goal</h3>
+      <p>Raise this session’s order value <b>without breaking trust</b>. Triggered by the session itself — no prompt, no chat.</p>
+      <small>session_start → agent wakes</small></div>
+    <div class="step"><h3>🧠 Plan</h3>
+      <p>Builds a <b>customer hypothesis</b> (camera glance + every tap + live cart) and picks a strategy per slot: cross-subsidy? swap? decoy? complete-the-meal? <b>or stop selling.</b></p>
+      <small>vision + 8B refine · 8-signal scorer</small></div>
+    <div class="step"><h3>🔧 Tools</h3>
+      <p>Chooses its own data &amp; tools: cluster POS pairs, store inventory, promo calendar, profile store, gpt-oss pitch writer; ordering agent wields <b>9 D1-grounded tools</b>.</p>
+      <small>D1 batch ~70ms · Workers AI</small></div>
+    <div class="step"><h3>⚡ Act</h3>
+      <p>Injects decisions into the <b>native journey</b>: savings flag, drink-led ADD ON, money-saving swap, festive re-skin. Places orders, applies vouchers, hands off to humans.</p>
+      <small>preemptive: computed before the screen opens</small></div>
+    <div class="step"><h3>✅ Verify</h3>
+      <p>Logs impression → accept → order; computes an <b>honest AOV counterfactual</b>. LLM slow? Falls back to deterministic copy. Never suggests what a store can’t serve.</p>
+      <small>self-checks + live telemetry</small></div>
+  </div>
+  <div class="card" style="border-color:var(--gold);">
+    <p><b>Decisions the agent makes by itself:</b>
+    <span class="chip g">which psychology play per slot</span><span class="chip g">offer the cheaper swap first</span><span class="chip g">stop selling when the meal is complete</span><span class="chip g">push overstock / protect stockouts</span><span class="chip g">escalate to a human</span></p>
+  </div>
+  <div class="foot">Every decision streams to a live system diagram — the judges can watch it think</div>
+</section>
+
+<!-- SLIDE 4 · EVIDENCE + IMPACT (2:30–3:30) -->
+<section class="slide">
+  <div class="tag">4 · Evidence + Impact</div>
+  <div class="kicker">Running in production — measured, not promised</div>
+  <div class="cols">
+    <div style="text-align:center;">
+      <div class="big" style="font-size:108px; font-weight:900; color:var(--gold);">+15%</div>
+      <p style="font-size:24px;">AOV with AI vs without<br/>(<b>+28.000₫/order</b> — logged counterfactual)</p>
+    </div>
+    <div style="text-align:center;">
+      <div class="big" style="font-size:108px; font-weight:900; color:#fff;">35%</div>
+      <p style="font-size:24px;">of AI suggestions accepted<br/>every impression &amp; accept logged</p>
+    </div>
+    <div style="text-align:center;">
+      <div class="big" style="font-size:108px; font-weight:900; color:var(--green);">13₫</div>
+      <p style="font-size:24px;">infra cost per session — <b>≈2,200× ROI</b><br/>Cloudflare list prices, itemized live</p>
+    </div>
+  </div>
   <div class="cols">
     <div>
       <ul>
-        <li><b>Customer Hypothesis Agent</b> — one camera glance + every tap → a living, confidence-scored guess. Invisible to the customer.</li>
-        <li><b>Recommendation Engine</b> — 8-signal deterministic scorer (~70ms) over the real crawled menu; LLM writes only the voice.</li>
-        <li><b>Ordering Agent (P4)</b> — 9 grounded tools: vouchers, loyalty, cart, order, human handoff.</li>
-        <li><b>Glass box</b> — every API call, D1 query, LLM call and strategy decision streams to a live diagram + cost meter.</li>
+        <li><b>70 automated end-to-end assertions</b> — green on the production URL right now (latency, psychology rules, per-store inventory, holiday scenario…).</li>
+        <li>Rec moment ≤1.5s; scorer ~70ms; survives total LLM outage.</li>
+        <li>Real catalog: <b>106 items crawled live</b> from kfcvietnam.com.vn by TinyFish agents.</li>
       </ul>
     </div>
-    <div><img class="shot" src="4k-v4-prod.png" /></div>
+    <div><img class="shot" src="asset-cost.png" style="max-height:34vh;" /></div>
   </div>
-  <div class="foot">One Cloudflare Worker · D1 · Workers AI · 106 real menu items crawled by TinyFish</div>
+  <div class="foot">Evidence tier: live production system + automated test suite — not benchmarks, not assumptions</div>
 </section>
 
-<!-- 4 · PROFILER -->
+<!-- SLIDE 5 · WHY IT WINS (3:30–4:00) -->
 <section class="slide">
-  <div class="kicker">The invisible profiler</div>
-  <h2>Guesses, never assumes</h2>
+  <div class="tag">5 · Why It Wins</div>
+  <div class="kicker">The unfair advantage</div>
+  <h2>Same journey. Invisible brain. Trust as strategy.</h2>
   <div class="cols">
     <div>
       <ul>
-        <li>Vision glance: <b>coarse bands only</b> — age band, attire, group. Never identity, nothing stored.</li>
-        <li>Every tap refines it: order type, a family bucket, a dismissed suggestion, <b>the live cart</b>.</li>
-        <li>Output = an action policy: <b>“what to suggest next”</b> — a full cart drives combo-bias to zero.</li>
-        <li>The kiosk shows <b>nothing</b>. The journey customers know stays untouched.</li>
-      </ul>
-      <p style="margin-top:14px;"><span class="chip">“A mother and her child out for a quick meal”</span>
-      <span class="chip g">→ “a dessert to complete the meal”</span></p>
-    </div>
-    <div><img class="shot" src="asset-hypothesis.png" /></div>
-  </div>
-  <div class="foot">llama-3.2-11b-vision (glance) + llama-3.1-8b-fast (refinement, ~1.3s, never blocking)</div>
-</section>
-
-<!-- 5 · ENGINE -->
-<section class="slide">
-  <div class="kicker">The engine — deterministic core, generative skin</div>
-  <h2>Context × 8 signals, explainable per pick</h2>
-  <div class="cols">
-    <div style="flex:1.25;">
-      <div class="card"><p style="font-family:Consolas,monospace; font-size:20px; line-height:1.7;">
-        score = .25·<b>co-occurrence</b> (9,000 POS baskets, per store-cluster × daypart)<br/>
-        &nbsp;+ .15·<b>persona</b> (live hypothesis × confidence) + .12·<b>affinity</b><br/>
-        &nbsp;+ .13·<b>daypart/holiday</b> + .13·<b>promo</b> + .10·<b>inventory posture</b><br/>
-        &nbsp;+ .07·<b>margin</b> + .05·<b>popularity</b></p></div>
-      <ul style="margin-top:18px;">
-        <li>Hard guards first: in stock <b>at this store</b>, never a category the combo covers, <b>never a bundle on a bundle</b>.</li>
-        <li>LLM (gpt-oss-120b) writes the pitch line only — raced vs 1.2s timeout into deterministic copy. <b>Survives total LLM outage.</b></li>
-        <li>Every slot carries a <b>strategy label</b> — the “why” is on screen.</li>
-      </ul>
-    </div>
-    <div>
-      <p><span class="chip g">🥤 Bù chéo lợi nhuận</span><span class="chip">👁 Khớp chân dung</span><span class="chip">🧺 Hay mua cùng</span><span class="chip">📦 Đẩy tồn kho</span><span class="chip">🏷️ Khuyến mãi</span><span class="chip">🕐 Hợp khung giờ</span></p>
-      <p style="margin-top:12px; font-size:20px; color:var(--dim);">Admin can toggle any signal live — the slate visibly changes.</p>
-    </div>
-  </div>
-  <div class="foot">Scorer ~70ms, one D1 batch · rec moment ≤1.5s end-to-end</div>
-</section>
-
-<!-- 6 · PSYCHOLOGY -->
-<section class="slide">
-  <div class="kicker">Buyer psychology — implemented, not claimed</div>
-  <h2>Four plays from the QSR playbook</h2>
-  <div class="grid2">
-    <div class="cols" style="gap:18px;"><img class="shot" style="max-height:30vh;" src="asset-mealsize.png" /><div>
-      <p><b>Loss aversion — for the customer.</b><br/>Honest “TIẾT KIỆM” flags, computed live.</p></div></div>
-    <div class="cols" style="gap:18px;"><img class="shot" style="max-height:30vh;" src="asset-decoy.png" /><div>
-      <p><b>Decoy tier.</b><br/>Vừa +0 · Lớn +10k · <b>Đại +12k</b> — asymmetric dominance.</p></div></div>
-    <div class="cols" style="gap:18px;"><img class="shot" style="max-height:30vh;" src="asset-addon.png" /><div>
-      <p><b>Cross-subsidy.</b><br/>Chicken, no drink → drink leads (90%+ margin). Sensory copy, honest attach rates.</p></div></div>
-    <div class="cols" style="gap:18px;"><img class="shot" style="max-height:30vh;" src="asset-swap.png" /><div>
-      <p><b>Kindness first.</b><br/>Separates → cheaper combo swap offered <b>before</b> any upsell. Full meal → it stops selling.</p></div></div>
-  </div>
-  <div class="foot">Menu-engineering literature (Kasavana–Smith), decoy-pricing research, QSR margin structure</div>
-</section>
-
-<!-- 7 · 250 STORES -->
-<section class="slide">
-  <div class="kicker">250 stores are not one store</div>
-  <h2>Per-store intelligence, one-tap scenarios</h2>
-  <div class="cols">
-    <div>
-      <ul>
-        <li>Stores → <b>site clusters</b> (mall / office / residential / tourist); each cluster’s baskets mined separately.</li>
-        <li><b>Live inventory</b>: push overstock, protect near-stockout, never suggest sold-out. Orders decrement stock.</li>
-        <li><b>Holiday calendar + seasonal skin</b>: Christmas combos, Noel promo, festive dress — staged in one tap.</li>
-        <li>Demand + stockout <b>forecast</b> per store from 90 days of POS history.</li>
+        <li><b>Zero re-education:</b> the AI lives <i>inside</i> the exact KFC journey customers already know — vs chatbot bolt-ons nobody uses at a kiosk.</li>
+        <li><b>Kindness-first economics:</b> it takes money OFF the bill (combo swap) before it upsells, and stops selling when the meal is complete. That’s why acceptance holds at 35%.</li>
+        <li><b>A brain per store:</b> cluster-mined baskets × live inventory × holiday calendar — staged in one tap (Đêm Giáng Sinh 🎄), operated by non-technical staff.</li>
+        <li><b>Glass box, near-zero cost:</b> every decision visible + itemized at 13₫/session — deployable to 250 stores inside the 90-day window on one Cloudflare Worker.</li>
       </ul>
     </div>
     <div><img class="shot" src="asset-xmas.png" style="max-height:56vh;" /></div>
   </div>
-  <div class="foot">Scenario Director: Trưa văn phòng · Tối cuối tuần TTTM · Đêm Giáng Sinh</div>
+  <div class="foot">Traditional: static box, updated monthly · Us: a salesperson’s judgment, per customer, per second</div>
 </section>
 
-<!-- 8 · ECONOMICS -->
-<section class="slide">
-  <div class="kicker">The economics — measured, not promised</div>
-  <div class="cols">
-    <div style="text-align:center;">
-      <div class="cost-big" style="font-size:120px; font-weight:900; color:var(--green);">≈13₫</div>
-      <p style="font-size:26px;">infra cost per customer session<br/><span style="color:var(--dim); font-size:19px;">Cloudflare list prices, itemized live on screen</span></p>
-    </div>
-    <div style="text-align:center;">
-      <div class="cost-big" style="font-size:120px; font-weight:900; color:var(--gold);">+28.000₫</div>
-      <p style="font-size:26px;">AOV lift per order <b>(+15%)</b><br/><span style="color:var(--dim); font-size:19px;">35% suggestion acceptance — logged, honest counterfactual</span></p>
-    </div>
-    <div><img class="shot" src="asset-cost.png" /></div>
-  </div>
-  <div class="card" style="border-color:var(--gold); text-align:center;"><p style="font-size:30px;"><b>≈ 2,200× return per customer</b> — and the free tier covers a small store’s whole day.</p></div>
-  <div class="foot">gpt-oss $0.35/$0.75 · 8B $0.045/$0.384 · vision $0.049/$0.676 per M tokens · D1 $0.001/M reads · $0.30/M requests</div>
-</section>
-
-<!-- 9 · PRODUCTION READY -->
-<section class="slide">
-  <div class="kicker">Production readiness</div>
-  <h2>Deploys in seconds, degrades gracefully</h2>
-  <div class="cols">
-    <div>
-      <ul>
-        <li><b>One Cloudflare Worker</b> + D1 + Workers AI + static assets. No build step, no fleet to manage.</li>
-        <li><b>70 automated end-to-end assertions</b> — green on production right now.</li>
-        <li>LLM down? Deterministic pitches; the scorer is pure math. <b>UX survives total outage.</b></li>
-        <li>New store = assign a cluster on day one; its own data refines it. POS integration = a nightly export.</li>
-        <li>Privacy by construction: coarse bands, no identity, hypothesis dies with the session.</li>
-      </ul>
-    </div>
-    <div class="card">
-      <p style="font-family:Consolas,monospace; font-size:19px; line-height:1.9;">
-Kiosk UI ─► Worker API ─► Rec Engine ─► D1<br/>
-&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─► Agent Loop ─► 9 tools ─► HITL staff<br/>
-&nbsp;&nbsp;└─ profiler (vision + 8B) ──► Workers AI<br/>
-ALL of it ─► telemetry ─► live diagram + cost meter
-      </p>
-    </div>
-  </div>
-  <div class="foot">Rollout across 250 stores fits inside the 90-day window</div>
-</section>
-
-<!-- 10 · CLOSE -->
+<!-- SLIDE 6 · DEMO + CLOSE (4:00–5:00) -->
 <section class="slide" style="background:radial-gradient(1200px 720px at 50% 15%, #FF2E4E 0%, var(--red) 45%, var(--red-dark) 100%); align-items:center; text-align:center;">
-  <img src="public/brand/kfc-logo-white.png" style="width:230px;" />
-  <h1 style="font-size:62px;">Trust first. Upsell follows.<br/>Pennies never mattered less.</h1>
-  <p style="color:#fff; font-weight:800; font-size:26px; background:rgba(0,0,0,.35); padding:12px 34px; border-radius:999px;">kfc-kiosk-agent.gentle-sky-3b0e.workers.dev · /kiosk · /admin</p>
-  <p style="color:rgba(255,255,255,.92); font-size:21px;">TinyFish · OpenAI gpt-oss-120b on Cloudflare Workers AI · Cloudflare Workers / D1 · Gemini imagery · Langfuse-ready</p>
+  <div class="tag" style="color:rgba(255,255,255,.7);">6 · Demo + Close</div>
+  <h2 style="font-size:56px;">60 seconds: watch it decide</h2>
+  <p style="color:#fff; font-size:23px; font-weight:700; max-width:1250px;">
+    0–10s Goal: a customer walks up &nbsp;·&nbsp; 10–20s Trigger: one glance + first taps → hypothesis
+    &nbsp;·&nbsp; 20–45s <b>Agent acts</b>: picks strategy, drink leads, swap saves 12.000₫
+    &nbsp;·&nbsp; 45–55s Outcome: bigger basket, happier customer &nbsp;·&nbsp; 55–60s Proof: +15% AOV at 13₫/session
+  </p>
+  <img src="asset-attract.png" style="max-height:38vh; border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.5);" />
+  <p style="color:#fff; font-weight:800; font-size:24px; background:rgba(0,0,0,.35); padding:12px 32px; border-radius:999px;">Try it now: kfc-kiosk-agent.gentle-sky-3b0e.workers.dev</p>
+  <p style="color:rgba(255,255,255,.9); font-size:19px;">TinyFish · OpenAI gpt-oss-120b on Cloudflare Workers AI · Cloudflare Workers/D1 · Gemini · Langfuse-ready</p>
 </section>
 
 <script>
-  // arrow-key navigation for presenting
   const slides = [...document.querySelectorAll('.slide')];
   let i = 0;
   const go = (n) => { i = Math.max(0, Math.min(slides.length - 1, n)); slides[i].scrollIntoView({ behavior: 'smooth' }); };

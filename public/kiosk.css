@@ -130,7 +130,9 @@ body.xmas .attract-title::after { content: " 🎄"; font-size: 6cqw; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.4cqw;
 }
 .ordertype-card:active { border-color: var(--kfc-red); }
-.ot-icon { font-size: 11cqw; }
+.ot-icon { color: var(--kfc-red); display: flex; }
+.ot-icon svg { width: 12cqw; height: 12cqw; }
+.ordertype-card:active .ot-icon { transform: scale(.94); }
 .ot-label { font-size: 3.2cqw; font-weight: 800; text-transform: uppercase; }
 
 /* ---------- shared shop layout: text rail + content ---------- */

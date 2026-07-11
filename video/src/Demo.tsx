@@ -202,6 +202,70 @@ const Close: React.FC = () => (
   </AbsoluteFill>
 );
 
+// ---------- 60s judging cut: Goal → Trigger → Agent Acts → Outcome → Proof ----------
+const D60 = { goal: 300, trigger: 300, act1: 250, act2: 250, act3: 250, outcome: 300, proof: 150 };
+export const DEMO60_DURATION = Object.values(D60).reduce((a, b) => a + b, 0); // 1800f = 60s
+
+const Proof60: React.FC = () => {
+  const frame = useCurrentFrame();
+  const roi = Math.round(interpolate(frame, [5, 60], [0, 2200], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) }));
+  return (
+    <AbsoluteFill style={{ background: INK, alignItems: "center", justifyContent: "center", gap: 30 }}>
+      <div style={bucketStripes} />
+      <FadeSlide><Kicker>Proof — measured on production</Kicker></FadeSlide>
+      <FadeSlide delay={4}>
+        <div style={{ ...HEAVY, fontSize: 100, color: "#fff", textAlign: "center" }}>
+          <span style={{ color: GOLD }}>+15% AOV</span> at <span style={{ color: GREEN }}>13₫</span>/session
+        </div>
+      </FadeSlide>
+      <FadeSlide delay={12}>
+        <div style={{ ...HEAVY, fontSize: 54, color: GOLD, border: `2px solid ${GOLD}`, borderRadius: 999, padding: "14px 52px", background: "rgba(242,169,0,.1)" }}>
+          ≈ {roi.toLocaleString("en-US")}× return · 70 tests green
+        </div>
+      </FadeSlide>
+      <FadeSlide delay={20}>
+        <div style={{ fontFamily: SANS, fontWeight: 800, fontSize: 34, color: "#fff" }}>kfc-kiosk-agent.gentle-sky-3b0e.workers.dev</div>
+      </FadeSlide>
+    </AbsoluteFill>
+  );
+};
+
+export const Demo60: React.FC = () => (
+  <Series>
+    <Series.Sequence durationInFrames={D60.goal}>
+      <Split kicker="Goal · 0:00" title="A customer walks up"
+        lines={["The agent’s standing goal: raise this order’s value — without breaking trust.", "No prompt. No chat. The session itself wakes it."]}
+        src="asset-attract.png" dur={D60.goal} />
+    </Series.Sequence>
+    <Series.Sequence durationInFrames={D60.trigger}>
+      <Split kicker="Trigger · 0:10" title="One glance + the first taps"
+        lines={["A coarse camera glance (age band, group — never identity)", "plus every tap streams into a living hypothesis:", "“A mother and her child…” → “a dessert to complete the meal.”"]}
+        src="asset-hypothesis.png" dur={D60.trigger} />
+    </Series.Sequence>
+    <Series.Sequence durationInFrames={D60.act1}>
+      <Split kicker="Agent acts · 0:20 · PLAN" kickerColor={GREEN} title="It picks a strategy by itself"
+        lines={["Cart: chicken, no drink → DECISION: cross-subsidy.", "Tools it consulted: cluster POS pairs · live stock · promo calendar · the hypothesis."]}
+        src="asset-mealsize.png" dur={D60.act1} />
+    </Series.Sequence>
+    <Series.Sequence durationInFrames={D60.act2}>
+      <Split kicker="Agent acts · 0:28 · ACT" kickerColor={GREEN} title="The drink leads the ADD ON"
+        lines={["Computed before the screen even opened — zero wait.", "Sensory copy with honest attach rates: “Gà nóng cần ngụm mát lạnh…”"]}
+        src="asset-addon.png" dur={D60.act2} />
+    </Series.Sequence>
+    <Series.Sequence durationInFrames={D60.act3}>
+      <Split kicker="Agent acts · 0:36 · DECIDE" kickerColor={GREEN} title="Then it takes money OFF the bill"
+        lines={["Separate items match a combo → DECISION: offer the cheaper swap first (−12.000₫).", "And once the meal is complete, it stops selling. That’s the trust play."]}
+        src="asset-swap.png" dur={D60.act3} />
+    </Series.Sequence>
+    <Series.Sequence durationInFrames={D60.outcome}>
+      <Split kicker="Outcome · 0:45" title="Bigger basket, happier customer"
+        lines={["A drink and a side they actually wanted, 12.000₫ saved on the combo,", "the exact journey they already knew — and everything the agent did", "is on the ops screen, verified and logged."]}
+        src="desktop-4k.png" dur={D60.outcome} />
+    </Series.Sequence>
+    <Series.Sequence durationInFrames={D60.proof}><Proof60 /></Series.Sequence>
+  </Series>
+);
+
 export const Demo: React.FC = () => (
   <Series>
     <Series.Sequence durationInFrames={DUR.title}><Title /></Series.Sequence>

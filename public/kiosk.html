@@ -32,11 +32,24 @@
         <h2 class="u-display" data-i18n="where_eat">Bạn dùng bữa ở đâu?</h2>
         <div class="ordertype-cards">
           <button class="ordertype-card" data-type="dine-in">
-            <span class="ot-icon">🍽️</span>
+            <span class="ot-icon" aria-hidden="true">
+              <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="32" cy="32" r="16" />
+                <circle cx="32" cy="32" r="7" />
+                <path d="M8 11v9M13 11v9M18 11v9M8 20a5 5 0 0 0 10 0M13 25v28" />
+                <path d="M53 11c-4 7-4 15 0 21M53 32v21" />
+              </svg>
+            </span>
             <span class="ot-label" data-i18n="dine_in">Ăn tại đây</span>
           </button>
           <button class="ordertype-card" data-type="takeaway">
-            <span class="ot-icon">🥡</span>
+            <span class="ot-icon" aria-hidden="true">
+              <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 24h34l-4.2 30H19.2z" />
+                <path d="M24 24v-5a8 8 0 0 1 16 0v5" />
+                <path d="M23 33c3 4 15 4 18 0" />
+              </svg>
+            </span>
             <span class="ot-label" data-i18n="takeaway">Mang đi</span>
           </button>
         </div>

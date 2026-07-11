@@ -125,8 +125,12 @@ ticker, Christmas combos appear, the rec window re-computes with 🏷️ promo c
 
 ## Assets
 - Live: https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev (`/` · `/kiosk` · `/admin`)
-- **Demo video (Remotion):** `video/out/kfc-demo.mp4` — 82s, 1080p. Rebuild: `cd video && npx remotion render src/index.ts kfc-demo out/kfc-demo.mp4`. Preview/edit: `npx remotion studio src/index.ts`.
-- **Slide deck:** `slide-deck.html` (open in browser, arrow keys to present, F11) + `slide-deck.pdf`
+- **Demo video (Remotion):** `video/out/kfc-demo-60s.mp4` — the 60s judging cut for pitch slide 6
+  (Goal → Trigger → Agent Acts → Outcome → Proof, per the organizer keynote); `video/out/kfc-demo.mp4` — 82s full cut for the portal.
+  Rebuild: `cd video && npx remotion render src/index.ts kfc-demo-60 out/kfc-demo-60s.mp4`. Preview/edit: `npx remotion studio src/index.ts`.
+- **Slide deck:** `slide-deck.html` + `slide-deck.pdf` — 6 slides on the organizer's 5-minute frame
+  (Team+Promise · Problem Insight · Agentic Workflow · Evidence+Impact · Why It Wins · Demo+Close).
+  ⚠️ Slide 1 says "MatViet Design Team" — edit if that's not the registered team name.
 - Screenshots: `4k-v4-prod.png`, `asset-*.png` (journey steps, panels), `v5-*.jpeg`, `v4-xmas-scenario.jpeg`
 - Tests: `node test/api-test.mjs <url>` → 70 assertions
 - Declared stack (bonus prizes): **TinyFish** (menu crawl) · **OpenAI gpt-oss-120b** via
