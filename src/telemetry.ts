@@ -81,3 +81,38 @@ export async function getSettings(env: Env): Promise<Record<string, unknown>> {
   }
   return out;
 }
+
+export async function todayHoliday(env: Env): Promise<string | null> {
+  const dateStr = vnNow().iso.slice(0, 10);
+  const h = await env.DB.prepare("SELECT name FROM holidays WHERE date=?").bind(dateStr).first<{ name: string }>();
+  return h?.name ?? null;
+}
+
+export interface Scenario {
+  store_id?: number; daypart?: Daypart; dow?: number; holiday?: string | boolean | null;
+  label?: string;
+}
+
+export interface Context {
+  daypart: Daypart; dow: number; festive: boolean; holiday: string | null;
+  storeId: number; scenario: Scenario | null;
+}
+
+// One source of truth for "when/where are we": real Vietnam time unless the
+// demo scenario override (settings.scenario) says otherwise.
+export async function getContext(env: Env, settings?: Record<string, unknown>): Promise<Context> {
+  const s = settings ?? await getSettings(env);
+  const sc = (s.scenario ?? null) as Scenario | null;
+  const now = vnNow();
+  const daypart = (sc?.daypart as Daypart) ?? now.daypart;
+  const dow = sc?.dow ?? now.dow;
+  let holiday: string | null = null;
+  if (sc && sc.holiday !== undefined && sc.holiday !== null && sc.holiday !== false) {
+    holiday = typeof sc.holiday === "string" ? sc.holiday : "Ngày lễ (kịch bản demo)";
+  } else if (!sc || sc.holiday === undefined) {
+    holiday = await todayHoliday(env);
+  }
+  const festive = dow === 0 || dow === 6 || holiday != null;
+  const storeId = sc?.store_id ?? Number(s.current_store ?? 1);
+  return { daypart, dow, festive, holiday, storeId, scenario: sc };
+}

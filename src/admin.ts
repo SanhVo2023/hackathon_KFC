@@ -29,6 +29,38 @@ export async function handleAdmin(
     return json({ ok: true, settings: await getSettings(env) });
   }
 
+  // ---------- scenario director (demo staging) ----------
+  if (path === "/scenario" && method === "POST") {
+    const body = (await request.json()) as {
+      scenario?: Record<string, unknown> | null;
+      inventory_preset?: "zinger_out" | "dessert_over" | "reset";
+      store_id?: number;
+    };
+    if (body.scenario !== undefined) {
+      await env.DB.prepare("INSERT INTO settings (key,value) VALUES ('scenario',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+        .bind(JSON.stringify(body.scenario)).run();
+      tel.emit("config_change", "admin", "worker",
+        body.scenario ? `🎬 scenario: ${(body.scenario as { label?: string }).label ?? JSON.stringify(body.scenario)}` : "🎬 scenario cleared → real time",
+        body.scenario);
+    }
+    if (body.inventory_preset) {
+      const storeId = body.store_id ?? (body.scenario as { store_id?: number })?.store_id ?? 1;
+      if (body.inventory_preset === "zinger_out") {
+        await env.DB.prepare(
+          "UPDATE store_inventory SET stock=0 WHERE store_id=? AND item_id IN (SELECT id FROM menu_items WHERE keywords LIKE '%burger zinger%' AND is_combo=0)",
+        ).bind(storeId).run();
+      } else if (body.inventory_preset === "dessert_over") {
+        await env.DB.prepare(
+          "UPDATE store_inventory SET stock=par_level*3 WHERE store_id=? AND item_id IN (SELECT id FROM menu_items WHERE category='dessert')",
+        ).bind(storeId).run();
+      } else {
+        await env.DB.prepare("UPDATE store_inventory SET stock=par_level WHERE store_id=?").bind(storeId).run();
+      }
+      tel.emit("config_change", "admin", "d1", `🎬 inventory preset: ${body.inventory_preset} @ store ${storeId}`);
+    }
+    return json({ ok: true, settings: await getSettings(env) });
+  }
+
   // ---------- stores ----------
   if (path === "/stores" && method === "GET") {
     const [stores, settings] = await Promise.all([

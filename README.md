@@ -2,9 +2,11 @@
 
 **Agentic AI Build Week 2026 · F&B Track (KFC Vietnam) · Problems P2 + P4**
 
-> A self-ordering kiosk where an agentic AI layer drives contextual upsell (P2) and full
-> conversational ordering with human handoff (P4) — with every API call, tool call, D1 query
-> and LLM decision visualized live on an animated system diagram.
+> A self-ordering kiosk where an agentic AI layer **guesses who the customer is** (one camera
+> glance at check-in + every tap after it), builds trust with **kindness-first combo-saving
+> suggestions**, then drives contextual upsell (P2) — with every API call, tool call, D1 query
+> and LLM decision visualized live on an animated system diagram. A conversational ordering
+> agent with human handoff covers P4 via API.
 
 **Live demo:** https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev
 
@@ -23,18 +25,37 @@
 
 ## What we built
 
+### 0. Customer hypothesis agent — "guess, never assume"
+At session start the kiosk takes one camera glance (demo: photo upload) — a **vision model**
+(llama-3.2-11b-vision, llava fallback) extracts only coarse, non-identifying attributes
+(age band, attire, group, context). Then **every interaction** — order type, a 4-person
+bucket, a dismissed suggestion — feeds **llama-3.1-8b-fast** (~1.3s) which continuously
+revises a persona hypothesis with category biases and a confidence score. A woman in casual
+clothes buying a 4-person wings combo → "likely a family" → dessert bias up. A man in a suit
+at noon → "office worker on a lunch break" → quick-drink bias up. The hypothesis is the
+engine's 8th signal and is shown live (photo, persona, evidence trail, bias bars) on the
+desktop ops view. Privacy by construction: no identity, no photo storage beyond the demo thumb.
+
+### 0b. Kindness first — trust before upsell
+If the customer builds a combo by hand (wings + Pepsi + fries as separate items), the engine
+first offers the **money-saving swap** to the real combo: *"Mẹo nhỏ nè: đổi sang Combo 1 Miếng
+Gà — vẫn đủ món bạn chọn mà tiết kiệm 13.000₫!"* — like a salesperson genuinely on the
+customer's side. Combos carry machine-readable contents, so the engine also **never
+recommends a cola on top of a combo that already includes one.**
+
 ### 1. Recommendation engine (P2) — deterministic scoring × LLM voice
-**Context = store cluster × location × time × day/holiday × inventory × promos × cart.**
-Every rec moment (item added, cart review, agent tool call) runs a **7-signal scorer** over
+**Context = customer hypothesis × store cluster × location × time × day/holiday × inventory × promos × cart.**
+Every rec moment (item added, cart review, agent tool call) runs an **8-signal scorer** over
 D1 in one batch (~70ms):
 
 ```
-score = .30·co-occurrence (9,000 POS baskets, pairs keyed by STORE CLUSTER × daypart)
-      + .15·affinity rules (anchor→addon category weights)
-      + .15·daypart fit    (breakfast/lunch/tea/dinner/late + weekend/holiday boost)
-      + .15·promo calendar (time-of-day + day-of-week aware promotions)
+score = .25·co-occurrence (9,000 POS baskets, pairs keyed by STORE CLUSTER × daypart)
+      + .15·persona        (the customer-hypothesis agent's live category bias × confidence)
+      + .12·affinity rules (anchor→addon category weights)
+      + .13·daypart fit    (breakfast/lunch/tea/dinner/late + weekend/holiday boost)
+      + .13·promo calendar (time-of-day + day-of-week aware promotions)
       + .10·inventory posture (push overstock, protect near-stockout, never suggest sold-out)
-      + .10·margin  + .05·popularity (POS-derived, per cluster+daypart)
+      + .07·margin  + .05·popularity (POS-derived, per cluster+daypart)
 ```
 
 **Per-store tailoring:** the 250+ stores are grouped into site clusters (mall / office /

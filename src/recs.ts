@@ -6,7 +6,8 @@
 //          raced against a 1200ms timeout with deterministic fallback copy.
 // Context = store cluster × location × time × day/holiday × inventory × promos × cart.
 
-import { Telemetry, vnNow, getSettings, type Daypart } from "./telemetry";
+import { Telemetry, getSettings, getContext, todayHoliday, type Daypart } from "./telemetry";
+import { getProfile } from "./profiler";
 
 export interface MenuItem {
   id: number; name: string; name_en: string | null; category: string;
@@ -33,6 +34,16 @@ export interface Recommendation {
 
 export interface RecOverrides { store_id?: number; daypart?: Daypart }
 
+export interface SmartSwap {
+  id: number; name: string; name_en: string | null; price: number; price_display: string;
+  image_url: string | null;
+  replaces: { id: number; name: string }[];
+  extras: string[];               // categories the combo adds on top
+  delta: number;                  // combo price − replaced items (negative = saves money)
+  delta_display: string;
+  message_vn: string; message_en: string;
+}
+
 const VND = (n: number) => n.toLocaleString("vi-VN") + "₫";
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
@@ -54,12 +65,7 @@ export async function getStore(env: Env, storeId: number): Promise<StoreInfo> {
   const s = await env.DB.prepare("SELECT * FROM stores WHERE id=?").bind(storeId).first<StoreInfo>();
   return s ?? { id: storeId, name: "KFC Việt Nam", district: null, cluster: "residential" };
 }
-
-export async function todayHoliday(env: Env): Promise<string | null> {
-  const dateStr = vnNow().iso.slice(0, 10);
-  const h = await env.DB.prepare("SELECT name FROM holidays WHERE date=?").bind(dateStr).first<{ name: string }>();
-  return h?.name ?? null;
-}
+export { todayHoliday };
 
 export async function recommend(
   env: Env,
@@ -68,18 +74,19 @@ export async function recommend(
   trigger: string,
   sessionId: string,
   overrides?: RecOverrides,
-): Promise<{ items: Recommendation[]; daypart: Daypart; store: StoreInfo; festive: boolean; holiday: string | null; signals_used: string[] }> {
-  const now = vnNow();
+): Promise<{ items: Recommendation[]; smart_swap: SmartSwap | null; daypart: Daypart; store: StoreInfo; festive: boolean; holiday: string | null; signals_used: string[] }> {
   const settings = await getSettings(env);
-  const daypart = overrides?.daypart ?? now.daypart;
-  const dow = now.dow;
-  const storeId = overrides?.store_id ?? Number(settings.current_store ?? 1);
+  const ctx = await getContext(env, settings);
+  const daypart = overrides?.daypart ?? ctx.daypart;
+  const dow = ctx.dow;
+  const storeId = overrides?.store_id ?? ctx.storeId;
+  const holiday = ctx.holiday;
+  const festive = ctx.festive;
   const signals = (settings.signals ?? {}) as Record<string, boolean>;
   const baseWeights = (settings.weights ?? {}) as Record<string, number>;
   const slots = Number(settings.rec_slots ?? 3);
 
-  const [store, holiday] = await Promise.all([getStore(env, storeId), todayHoliday(env)]);
-  const festive = dow === 0 || dow === 6 || holiday != null;
+  const [store, profile] = await Promise.all([getStore(env, storeId), getProfile(env, sessionId)]);
 
   // renormalize weights over enabled signals
   const enabled = Object.keys(baseWeights).filter((k) => signals[k] !== false);
@@ -120,6 +127,18 @@ export async function recommend(
 
   const anchorCats = new Set(cartItems.map((i) => i.category));
   const lastAnchorCat = cartItems.length ? cartItems[cartItems.length - 1].category : null;
+  // categories already INSIDE cart combos (a combo with a Pepsi covers "drink" —
+  // never recommend another cola on top of it)
+  const coveredCats = new Set<string>();
+  const comboInsides: string[] = [];
+  for (const i of cartItems) {
+    if (i.is_combo && i.combo_contents) {
+      try {
+        for (const c of JSON.parse(i.combo_contents) as string[]) coveredCats.add(c);
+        comboInsides.push(`${i.name} already includes: ${(JSON.parse(i.combo_contents) as string[]).join(", ")}`);
+      } catch { /* legacy rows */ }
+    }
+  }
   const affs = (affRows.results as { anchor_category: string; addon_category: string; weight: number; reason: string }[])
     .filter((a) => anchorCats.has(a.anchor_category));
   const promos = promoRows.results as unknown as Promo[];
@@ -128,12 +147,58 @@ export async function recommend(
   const subtotal = cartItems.reduce((s, i) => s + i.price * (cart.find((c) => c.item_id === i.id)?.qty ?? 1), 0);
   const priceCap = Math.max(45000, subtotal * 0.4);
 
+  // ---------- kindness first: does an existing combo cover what they already
+  // picked, for less money (or more food at ~the same price)? Offer the SWAP
+  // before any upsell — trust like a salesperson who's genuinely on their side.
+  const CAT_VN: Record<string, string> = { chicken: "gà", "burger-rice": "burger/cơm", snack: "khoai/salad", drink: "nước", dessert: "tráng miệng", combo: "combo" };
+  let smartSwap: SmartSwap | null = null;
+  const nonComboCart = cartItems.filter((i) => !i.is_combo);
+  if (nonComboCart.length >= 2) {
+    const cartByCat = new Map<string, MenuItem>();
+    for (const i of nonComboCart) if (!cartByCat.has(i.category)) cartByCat.set(i.category, i);
+    let best: { c: Candidate; matched: MenuItem[]; extras: string[]; delta: number; value: number } | null = null;
+    for (const c of candRows.results as unknown as Candidate[]) {
+      if (!c.is_combo || !c.combo_contents || !c.inv_available || (c.stock != null && c.stock <= 5)) continue;
+      let contents: string[];
+      try { contents = JSON.parse(c.combo_contents); } catch { continue; }
+      const matched = contents.filter((cat) => cartByCat.has(cat)).map((cat) => cartByCat.get(cat)!);
+      if (matched.length < 2) continue;
+      const replacedSum = matched.reduce((s, m) => s + m.price, 0);
+      const extras = contents.filter((cat) => !cartByCat.has(cat));
+      const delta = c.price - replacedSum;
+      const worthIt = delta < 0 || (extras.length > 0 && delta <= Math.min(15000, replacedSum * 0.25));
+      if (!worthIt) continue;
+      const value = -delta + extras.length * 8000;
+      if (!best || value > best.value) best = { c, matched, extras, delta, value };
+    }
+    if (best) {
+      const extrasVn = best.extras.map((e) => CAT_VN[e] ?? e).join(" + ");
+      smartSwap = {
+        id: best.c.id, name: best.c.name, name_en: best.c.name_en,
+        price: best.c.price, price_display: VND(best.c.price), image_url: best.c.image_url,
+        replaces: best.matched.map((m) => ({ id: m.id, name: m.name })),
+        extras: best.extras, delta: best.delta,
+        delta_display: (best.delta < 0 ? "−" : "+") + VND(Math.abs(best.delta)),
+        message_vn: best.delta < 0
+          ? `Mẹo nhỏ nè: đổi sang ${best.c.name} — vẫn đủ món bạn chọn mà tiết kiệm ${VND(-best.delta)}!`
+          : `Mẹo nhỏ nè: đổi sang ${best.c.name} — có thêm ${extrasVn} mà chỉ thêm ${VND(best.delta)}.`,
+        message_en: best.delta < 0
+          ? `Friendly tip: switch to ${best.c.name} — everything you picked, and save ${VND(-best.delta)}!`
+          : `Friendly tip: switch to ${best.c.name} — adds ${best.extras.join(" + ")} for just ${VND(best.delta)} more.`,
+      };
+      tel.emit("smart_swap", "rec", "kiosk",
+        `kindness-first: swap → ${best.c.name} (${smartSwap.delta_display}${best.extras.length ? `, +${best.extras.join("/")}` : ""})`,
+        { combo: best.c.name, delta: best.delta, replaces: smartSwap.replaces.map((r) => r.name) });
+    }
+  }
+
   const inCart = new Set(cartIds);
   const candidates = (candRows.results as unknown as Candidate[]).filter((m) => {
     if (inCart.has(m.id)) return false;
     if (!m.inv_available) return false;
     if (m.stock != null && m.stock <= 5) return false;   // protect near-stockout items
     if (m.price > priceCap) return false;
+    if (coveredCats.has(m.category)) return false;       // combo already contains this kind of item
     if (lastAnchorCat && m.category === lastAnchorCat && m.category !== "combo") return false;
     return true;
   });
@@ -160,6 +225,10 @@ export async function recommend(
       const posture = m.stock == null || m.par_level == null
         ? 0.5 : clamp01(0.5 + 0.5 * ((m.stock - m.par_level) / Math.max(m.par_level, 1)));
       breakdown.inventory = w.inventory * posture;
+    }
+    if (w.persona) {
+      // the customer-hypothesis agent's live category bias (8th signal)
+      breakdown.persona = w.persona * (profile?.category_bias?.[m.category] ?? 0) * (profile ? Math.max(0.4, profile.confidence) : 0);
     }
     if (w.margin) breakdown.margin = w.margin * (m.margin_pct / 100);
     if (w.popularity) breakdown.popularity = w.popularity * ((popMap.get(m.id)?.share ?? m.popularity * maxShare * 0.5) / maxShare);
@@ -214,7 +283,7 @@ export async function recommend(
     tel.emit("llm_call", "rec", "llm", "pitch generation (gpt-oss-120b)", { items: recs.map((r) => r.name) });
     try {
       const pitched = await Promise.race([
-        llmPitch(env, cartItems, recs, daypart, store, festive),
+        llmPitch(env, cartItems, recs, daypart, store, festive, profile?.persona ?? null, comboInsides),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
       ]);
       if (pitched) {
@@ -239,7 +308,7 @@ export async function recommend(
     ).bind(sessionId, trigger, JSON.stringify(cartIds), JSON.stringify(recs.map((r) => r.id))).run();
   }
 
-  return { items: recs, daypart, store, festive, holiday, signals_used: enabled };
+  return { items: recs, smart_swap: smartSwap, daypart, store, festive, holiday, signals_used: enabled };
 }
 
 function fallbackPitch(m: MenuItem, coPct: number | null, promo: Promo | undefined, lang: "vi" | "en"): string {
@@ -264,8 +333,12 @@ async function llmPitch(
   daypart: Daypart,
   store: StoreInfo,
   festive: boolean,
+  persona: string | null,
+  comboInsides: string[],
 ): Promise<{ id: number; pitch_vn: string; pitch_en: string }[] | null> {
-  const prompt = `You write kiosk upsell one-liners for ${store.name} (a ${store.cluster}-area KFC in Vietnam). Cart: ${cartItems.map((i) => i.name).join(", ")}. Daypart: ${daypart}${festive ? " (weekend/holiday — family mood)" : ""}.
+  const prompt = `You write kiosk upsell one-liners for ${store.name} (a ${store.cluster}-area KFC in Vietnam). Daypart: ${daypart}${festive ? " (weekend/holiday — family mood)" : ""}.
+Cart: ${cartItems.map((i) => i.name).join(", ")}.${comboInsides.length ? ` NOTE — ${comboInsides.join("; ")}. Pitches must COMPLEMENT what the cart already contains, never duplicate it.` : ""}
+${persona ? `Customer hypothesis (a guess — use the vibe, never state it literally): ${persona}. Tailor the tone (e.g. family → kids/sharing angle, office worker → quick/refreshing angle).` : ""}
 Candidates (with data-driven reasons): ${JSON.stringify(recs.map((r) => ({ id: r.id, name: r.name, price: r.price_display, attach_pct: r.co_pct, promo: r.promo_code })))}.
 For EACH candidate return one short, appetizing pitch line (max 14 words) in Vietnamese and English. Mention the attach_pct stat or promo when present. Return ONLY JSON:
 {"items":[{"id":number,"pitch_vn":string,"pitch_en":string}]}`;

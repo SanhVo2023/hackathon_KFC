@@ -215,7 +215,93 @@ let recItemIds = [];
   check("order decrements store inventory", ord.status === 200 && targetAfter.stock === target.stock - 2, `before=${target?.stock} after=${targetAfter?.stock}`);
 }
 
-// 13. chat poll (HITL relay endpoint)
+// 13. customer hypothesis profiler
+{
+  // behavior-only profile (no photo): family-size order → persona + bias emerge
+  const r = await api("/api/profile/event", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, observation: "added 1× family bucket for 4 people with wings (a sharing/group-size item), order type: dine-in" }),
+  });
+  check(`profiler responds with hypothesis (${r.ms}ms)`, r.status === 200 && (r.body.profile?.persona ?? "").length > 5, JSON.stringify(r.body).slice(0, 200));
+  check("profiler produces category bias", r.body.profile && typeof r.body.profile.category_bias === "object");
+  console.log(`     persona: "${r.body.profile?.persona}" | bias: ${JSON.stringify(r.body.profile?.category_bias)}`);
+
+  const p = await api(`/api/profile?session_id=${SESSION}`);
+  check("profile persisted + readable", p.body.profile?.persona?.length > 0);
+
+  // rec engine consumes the persona signal
+  const rec = await api("/api/recommend", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, cart: [{ item_id: chicken.id, qty: 1 }], trigger: "item_added" }),
+  });
+  check("rec breakdown includes persona signal", (rec.body.items ?? []).every((i) => "persona" in i.breakdown));
+
+  // photo endpoint is resilient to junk input (vision may fail, profile must not)
+  const tinyJpeg = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAAAAAAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
+  const ph = await api("/api/profile/photo", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION + "-photo", image: tinyJpeg, thumb: tinyJpeg }),
+  });
+  check("photo check-in endpoint resilient", ph.status === 200 && ph.body.ok === true && ph.body.profile?.persona?.length > 0);
+}
+
+// 14. combo contents: never recommend what the combo already includes
+{
+  const comboWithDrink = menu.find((m) => m.is_combo && m.combo_contents && JSON.parse(m.combo_contents).includes("drink"));
+  check(`combos carry contents metadata (e.g. "${comboWithDrink?.name}")`, !!comboWithDrink, "no combo with drink contents found");
+  if (comboWithDrink) {
+    const covered = JSON.parse(comboWithDrink.combo_contents);
+    const r = await api("/api/recommend", {
+      method: "POST",
+      body: JSON.stringify({ session_id: SESSION, cart: [{ item_id: comboWithDrink.id, qty: 1 }], trigger: "item_added" }),
+    });
+    const cats = (r.body.items ?? []).map((i) => i.category);
+    check(`no rec duplicates combo contents [${covered.join(",")}] (got: ${cats.join(",")})`, cats.every((c) => !covered.includes(c)));
+  }
+}
+
+// 15. kindness-first smart swap: separate items → cheaper combo suggested
+{
+  const ga = menu.find((m) => m.name === "1 Miếng Gà Rán");
+  const pepsi = menu.find((m) => m.name === "Pepsi (Vừa)");
+  const khoai = menu.find((m) => m.name === "Khoai Tây Chiên (Vừa)");
+  if (ga && pepsi && khoai) {
+    const r = await api("/api/recommend", {
+      method: "POST",
+      body: JSON.stringify({
+        session_id: SESSION, trigger: "cart_review",
+        cart: [{ item_id: ga.id, qty: 1 }, { item_id: pepsi.id, qty: 1 }, { item_id: khoai.id, qty: 1 }],
+      }),
+    });
+    const sw = r.body.smart_swap;
+    check("smart swap offered for separate items", !!sw, JSON.stringify(r.body).slice(0, 200));
+    if (sw) {
+      check(`swap is a genuine saving or bonus (Δ ${sw.delta_display})`, sw.delta < 0 || sw.extras.length > 0);
+      check("swap message is kindness-toned", (sw.message_vn ?? "").length > 10);
+      console.log(`     swap: ${sw.name} ${sw.delta_display} — "${sw.message_vn}"`);
+    }
+  } else {
+    check("smart swap fixtures present", false, "menu items for swap test not found");
+  }
+}
+
+// 15b. scenario director override
+{
+  const set = await api("/api/admin/scenario", {
+    method: "POST",
+    body: JSON.stringify({ scenario: { label: "test-scenario", store_id: 2, daypart: "dinner", dow: 6, holiday: null } }),
+  });
+  check("scenario set", set.status === 200);
+  const m2 = await api("/api/menu");
+  check("menu follows scenario (store 2, dinner)", m2.body.store?.id === 2 && m2.body.daypart === "dinner" && m2.body.scenario === "test-scenario");
+  check("scenario inventory respected (Zinger hidden at store 2)", !(m2.body.items ?? []).some((i) => i.name === "Burger Zinger"));
+  const clear = await api("/api/admin/scenario", { method: "POST", body: JSON.stringify({ scenario: null }) });
+  check("scenario cleared to real time", clear.status === 200);
+  const m3 = await api("/api/menu");
+  check("menu back on real store", m3.body.scenario == null);
+}
+
+// 16. chat poll (HITL relay endpoint)
 {
   const r = await api(`/api/chat/poll?session_id=${SESSION}&after=0`);
   check("chat poll returns transcript", r.status === 200 && Array.isArray(r.body.messages));

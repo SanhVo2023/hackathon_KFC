@@ -5,9 +5,10 @@
 // /api/*       -> kiosk + agent + admin APIs (D1-grounded)
 
 import { runAgent } from "./agent";
-import { recommend, getStore, todayHoliday, type CartLine } from "./recs";
+import { recommend, getStore, type CartLine } from "./recs";
 import { placeOrder } from "./tools";
-import { Telemetry, handleTelemetryGet, vnNow, getSettings } from "./telemetry";
+import { profileFromPhoto, refineProfile, getProfile } from "./profiler";
+import { Telemetry, handleTelemetryGet, vnNow, getContext } from "./telemetry";
 import { handleAdmin } from "./admin";
 
 interface ChatBody {
@@ -66,9 +67,9 @@ async function handlePublic(
   if (path === "/api/menu" && method === "GET") {
     tel.emit("api_call", "kiosk", "worker", "GET /api/menu");
     const t0 = Date.now();
-    const settings = await getSettings(env);
-    const storeId = Number(url.searchParams.get("store_id") ?? settings.current_store ?? 1);
-    const [store, holiday] = await Promise.all([getStore(env, storeId), todayHoliday(env)]);
+    const ctx = await getContext(env);
+    const storeId = Number(url.searchParams.get("store_id") ?? ctx.storeId);
+    const store = await getStore(env, storeId);
     // a store's kiosk only sells what that store actually has
     const rs = await env.DB.prepare(
       `SELECT m.*, COALESCE(si.stock, 99) AS stock FROM menu_items m
@@ -76,21 +77,44 @@ async function handlePublic(
        WHERE m.available = 1 AND COALESCE(si.available, 1) = 1 AND COALESCE(si.stock, 99) > 0
        ORDER BY m.category, m.price`,
     ).bind(storeId).all();
-    const now = vnNow();
-    const festive = now.dow === 0 || now.dow === 6 || holiday != null;
-    tel.emit("d1_query", "worker", "d1", `menu @ ${store.name}: ${rs.results.length} items in stock`, undefined, Date.now() - t0);
-    return json({ items: rs.results, store, festive, holiday, ...now });
+    tel.emit("d1_query", "worker", "d1", `menu @ ${store.name}: ${rs.results.length} items in stock${ctx.scenario ? " [scenario]" : ""}`, undefined, Date.now() - t0);
+    return json({
+      items: rs.results, store, festive: ctx.festive, holiday: ctx.holiday,
+      daypart: ctx.daypart, dow: ctx.dow, scenario: ctx.scenario?.label ?? null,
+    });
   }
 
   if (path === "/api/promotions" && method === "GET") {
     tel.emit("api_call", "kiosk", "worker", "GET /api/promotions");
-    const { daypart, dow } = vnNow();
+    const { daypart, dow } = await getContext(env);
     const rs = await env.DB.prepare("SELECT * FROM promotions WHERE active=1").all();
     const promos = (rs.results as { daypart: string | null; days_of_week: string | null }[]).map((p) => ({
       ...p,
       applies_now: (!p.daypart || p.daypart === daypart) && (!p.days_of_week || p.days_of_week.split(",").map(Number).includes(dow)),
     }));
     return json({ daypart, promotions: promos });
+  }
+
+  // ---------- customer hypothesis (the profiling agent) ----------
+  if (path === "/api/profile/photo" && method === "POST") {
+    const body = (await request.json()) as { session_id: string; image: string; thumb?: string };
+    if (!body?.session_id || !body?.image) return json({ error: "session_id and image required" }, 400);
+    tel.emit("api_call", "kiosk", "profiler", "📷 camera check-in (demo upload)");
+    const profile = await profileFromPhoto(env, tel, body.session_id, body.image, body.thumb ?? null);
+    return json({ ok: true, profile });
+  }
+
+  if (path === "/api/profile/event" && method === "POST") {
+    const body = (await request.json()) as { session_id: string; observation: string };
+    if (!body?.session_id || !body?.observation) return json({ error: "session_id and observation required" }, 400);
+    tel.emit("api_call", "kiosk", "profiler", `behavior signal: ${body.observation.slice(0, 60)}`);
+    const profile = await refineProfile(env, tel, body.session_id, body.observation.slice(0, 200));
+    return json({ ok: true, profile });
+  }
+
+  if (path === "/api/profile" && method === "GET") {
+    const profile = await getProfile(env, url.searchParams.get("session_id") ?? "");
+    return json({ profile });
   }
 
   // ---------- recommendations (P2 kiosk moments + admin simulator) ----------

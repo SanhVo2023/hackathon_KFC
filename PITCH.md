@@ -8,25 +8,30 @@
 > order value is being left on the table. We built the agentic layer that captures it —
 > and you can watch it think, live, on this diagram."
 
-## 0:20 — P2 demo: the rec moment (60s)
-On the kiosk (left): tap start → dine-in → add **Combo 1 Miếng Gà**.
-- The golden **AI sheet** slides up: "83% khách chọn món giống bạn cũng thêm…"
-- Point right: the diagram just pulsed Kiosk → Worker → **Rec Engine → D1 → Workers AI**.
-- Say: "Six signals — real co-occurrence from POS baskets, affinity rules, it's 8pm so
-  dinner items boost, tonight's promo calendar, margin, popularity. Scored in 70 milliseconds,
-  the pitch line written by gpt-oss-120b with a hard timeout so the kiosk never lags."
-- Accept the Pepsi → header stat "REC ACCEPT" ticks.
+## 0:20 — The profiler: AI guesses the customer (55s)
+Tap start → **camera check-in** → upload the prepared photo (business suit / mom-with-kids).
+- Point right: the **CUSTOMER HYPOTHESIS panel** fills — "Office worker on a quick lunch
+  break", confidence bar, category-bias bars.
+- Order dine-in, add a chicken piece → the hypothesis **updates live** from behavior alone:
+  "…alone, hungry, wants something quick" — evidence trail visible.
+- Say: "It never assumes — a vision glance gives coarse hints, and every tap revises the
+  guess. Watch the confidence climb as evidence agrees."
 
-## 1:20 — P4 demo: conversational ordering + human handoff (60s)
-Open **Trợ lý AI** on the kiosk, type: *"Có khuyến mãi gì tối nay không?"* → grounded answer
-with tonight's real promos (watch Agent Loop → D1 → LLM pulse).
-Then: *"Tôi bị dị ứng đậu phộng, cho tôi gặp nhân viên"* →
-- Agent escalates → **CS/Sales node pulses green** → banner: "Nhân viên Ngọc Trâm đang hỗ trợ."
-- Switch to `/admin` → Hỗ trợ khách: the conversation is there; reply as staff → it appears
-  on the kiosk. "Human-in-the-loop is built in — the agent knows what it shouldn't handle."
+## 1:15 — Kindness first, then the upsell (65s)
+Add a **Pepsi separately** → the golden sheet opens with the AI visibly thinking
+("đang xem đơn tương tự… đang kiểm tra bếp…"), then leads with the **green swap card**:
+- "Mẹo nhỏ nè: đổi sang Combo — vẫn đủ món bạn chọn mà **tiết kiệm 13.000₫**."
+- Say: "Trust first. The AI takes money OFF the bill when a combo covers what you picked —
+  like a staff member who's genuinely on your side. THEN it upsells — and acceptance goes up."
+- Tap the swap, then accept the persona-matched dessert rec → REC ACCEPT ticks.
+- Note the combo-awareness: "it will never offer a cola when your combo already has one."
 
-## 2:20 — Per-store intelligence + the business case (40s)
-Open `/admin` → AI Gợi ý → **Chạy thử gợi ý (what-if simulator)**:
+## 2:20 — Scenario director + the business case (40s)
+Click **🎬 Scenario** on the desktop view → tap "Tối T7 ở TTTM" preset:
+the kiosk instantly becomes the Vincom mall store on Saturday dinner (Zinger out of stock,
+family recs). Say: "Any store, any hour, any holiday, any inventory situation — staged in
+one tap. 250 stores are not one store."
+Then open `/admin` → AI Gợi ý → **Chạy thử gợi ý (what-if simulator)**:
 > "250 stores are not one store. Same fried-chicken cart: the office tower at lunch gets
 > Pepsi + salad; the mall on a Saturday night gets fries + ice cream for the kids. Every
 > kiosk mines its own cluster's baskets — and the inventory signal pushes what the store

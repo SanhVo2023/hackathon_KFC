@@ -1,46 +1,63 @@
-// KFC self-order kiosk — full customer journey state machine.
+// KFC self-order kiosk — full customer journey with a live customer-hypothesis
+// agent: camera glance at check-in (demo: photo upload), then every interaction
+// refines the guess that biases the recommendations.
 (() => {
-  const { $, $$, fmtVND, api, postEvent, CAT_META, DAYPART_META, sessionId } = window.KFC;
+  const KFC = window.KFC;
+  const { $, $$, fmtVND, api, postEvent, CAT_META, DAYPART_META } = KFC;
 
   // ---------- i18n ----------
   const L = {
     vi: {
       attract_sub: "Đặt món ngay tại đây", tap_to_start: "Chạm để bắt đầu",
-      attract_ai: "Trợ lý AI gợi ý món hợp khẩu vị",
+      attract_ai: "AI gợi ý món hợp khẩu vị riêng bạn",
+      camera_title: "Nhìn vào camera nhé!",
+      camera_sub: "AI nhìn một thoáng để gợi ý món hợp với bạn hơn — không lưu ảnh, không nhận diện danh tính.",
+      camera_hint: "Demo: chạm để tải ảnh lên", skip: "Bỏ qua →",
+      camera_scanning: "AI đang nhìn một thoáng…", camera_done: "✓ Xong! Gợi ý đã được cá nhân hóa.",
       where_eat: "Bạn dùng bữa ở đâu?", dine_in: "Ăn tại đây", takeaway: "Mang đi",
       your_order: "Đơn của bạn", add_more: "+ Thêm món", checkout: "Thanh toán",
       apply: "Áp dụng", check: "Kiểm tra", payment: "Thanh toán",
       card: "Thẻ", cash: "Tiền mặt tại quầy", scan_qr: "Quét mã để thanh toán", back: "← Quay lại",
       order_placed: "Đặt món thành công!", order_number_is: "Số đơn của bạn", new_order: "Bắt đầu đơn mới",
-      view_cart: "Xem đơn hàng", rec_title: "Thường được gọi kèm", no_thanks: "Không, cảm ơn",
-      chat_fab: "Trợ lý AI", chat_title: "KFC Trợ Lý — đặt món bằng lời",
+      view_cart: "Xem đơn hàng", rec_title: "Gợi ý cho riêng bạn", no_thanks: "Không, cảm ơn",
       added: "Đã thêm vào đơn", subtotal: "Tạm tính", discount: "Giảm giá", total: "Tổng cộng",
       empty_cart: "Chưa có món nào. Chạm “+ Thêm món” nhé!",
       status_received: "Đã nhận", status_preparing: "Đang chuẩn bị", status_ready: "Sẵn sàng", status_completed: "Hoàn tất",
       voucher_ok: (c, d) => `Mã ${c} hợp lệ: giảm ${d}`, voucher_bad: "Mã không áp dụng được lúc này",
       loyalty_ok: (n, p, t) => `Chào ${n}! Bạn có ${p} điểm (hạng ${t}).`, loyalty_bad: "Số này chưa là thành viên",
-      handoff_banner: "👤 Nhân viên đang hỗ trợ bạn trực tiếp",
-      chat_suggests: ["Gợi ý combo cho 2 người", "Có khuyến mãi gì không?", "Kiểm tra điểm thành viên", "Món nào cay?"],
-      agent_name: "Trợ lý AI", staff_name: "Nhân viên KFC",
+      thinking: [
+        "Đang xem các đơn tương tự tại cửa hàng…",
+        "Đang kiểm tra bếp còn món gì…",
+        "Đang đoán khẩu vị của bạn…",
+        "AI đang viết lời mời riêng cho bạn…",
+      ],
+      add_to_order: "Thêm vào đơn",
     },
     en: {
       attract_sub: "Order right here", tap_to_start: "Tap to start",
-      attract_ai: "AI assistant suggests dishes you'll love",
+      attract_ai: "AI suggests dishes tailored to you",
+      camera_title: "Look at the camera!",
+      camera_sub: "The AI takes one quick glance to tailor suggestions — no photo stored, no identity recognition.",
+      camera_hint: "Demo: tap to upload a photo", skip: "Skip →",
+      camera_scanning: "AI is taking a glance…", camera_done: "✓ Done! Suggestions personalized.",
       where_eat: "Where are you eating?", dine_in: "Dine in", takeaway: "Take away",
       your_order: "Your order", add_more: "+ Add items", checkout: "Checkout",
       apply: "Apply", check: "Check", payment: "Payment",
       card: "Card", cash: "Cash at counter", scan_qr: "Scan to pay", back: "← Back",
       order_placed: "Order placed!", order_number_is: "Your order number", new_order: "Start new order",
-      view_cart: "View order", rec_title: "Great with your order", no_thanks: "No, thanks",
-      chat_fab: "AI Assistant", chat_title: "KFC Assistant — order by chat",
+      view_cart: "View order", rec_title: "Picked for you", no_thanks: "No, thanks",
       added: "Added to order", subtotal: "Subtotal", discount: "Discount", total: "Total",
       empty_cart: "Nothing here yet. Tap “+ Add items”!",
       status_received: "Received", status_preparing: "Preparing", status_ready: "Ready", status_completed: "Done",
       voucher_ok: (c, d) => `Code ${c} valid: ${d} off`, voucher_bad: "Code doesn't apply right now",
       loyalty_ok: (n, p, t) => `Hi ${n}! You have ${p} points (${t} tier).`, loyalty_bad: "Not a member yet",
-      handoff_banner: "👤 A staff member is helping you directly",
-      chat_suggests: ["Suggest a combo for 2", "Any promos now?", "Check my points", "What's spicy?"],
-      agent_name: "AI Assistant", staff_name: "KFC Staff",
+      thinking: [
+        "Reading similar orders at this store…",
+        "Checking what the kitchen has…",
+        "Guessing your taste…",
+        "AI is writing your personal pitch…",
+      ],
+      add_to_order: "Add to order",
     },
   };
 
@@ -50,13 +67,12 @@
     screen: "attract",
     orderType: null,
     menu: [], byCat: {}, cats: [], activeCat: null,
-    daypart: null, promos: [],
+    daypart: null, promos: [], store: null, festive: false, holiday: null,
     cart: [], // {item, qty, mods:[], fromRec:bool}
     voucher: null, loyalty: null,
-    chatHistory: [], chatOpen: false,
-    handoff: false, chatPollCursor: 0, chatPollTimer: null,
     lastOrder: null, statusTimer: null,
     recSheetItems: [],
+    thinkTimer: null,
   };
 
   const t = (k, ...a) => { const v = L[S.lang][k]; return typeof v === "function" ? v(...a) : v; };
@@ -76,20 +92,23 @@
     el._t = setTimeout(() => el.classList.remove("show"), 1800);
   }
 
+  // fire-and-forget behavior signal to the profiler agent
+  function observe(observation) {
+    postEvent("profile_signal", observation);
+    return api("/api/profile/event", { method: "POST", body: { session_id: KFC.sessionId, observation } }).catch(() => null);
+  }
+
   // ---------- navigation ----------
   function show(screen) {
     S.screen = screen;
     $$(".screen").forEach((s) => s.classList.remove("active"));
     $(`#screen-${screen}`).classList.add("active");
-    document.getElementById("kiosk").classList.toggle("screen-attract-mode", screen === "attract");
-    $("#kiosk-header").style.display = screen === "attract" ? "none" : "flex";
-    const inFlow = ["menu", "cart"].includes(screen);
-    $("#cart-bar").classList.toggle("hidden", !(inFlow && S.cart.length && screen !== "cart"));
-    $("#chat-fab").classList.toggle("hidden", !["menu", "cart", "payment"].includes(screen));
+    $("#kiosk-header").style.display = ["attract", "camera"].includes(screen) ? "none" : "flex";
+    $("#cart-bar").classList.toggle("hidden", !(screen === "menu" && S.cart.length));
     postEvent("screen_change", `kiosk screen → ${screen}`);
     if (screen === "cart") renderCart();
-    // fresh store/menu context for each new customer (admin may have switched store)
     if (screen === "attract") loadMenu().catch(() => {});
+    if (screen === "confirm") launchConfetti();
   }
 
   // ---------- menu ----------
@@ -104,7 +123,7 @@
     S.byCat = {};
     for (const m of S.menu) (S.byCat[m.category] ??= []).push(m);
     S.cats = ["combo", "chicken", "burger-rice", "snack", "drink", "dessert"].filter((c) => S.byCat[c]?.length);
-    S.activeCat ??= S.cats[0];
+    if (!S.cats.includes(S.activeCat)) S.activeCat = S.cats[0];
     const promoData = await api("/api/promotions");
     S.promos = promoData.promotions;
     renderDaypartBanner();
@@ -130,21 +149,70 @@
 
   function imgTag(m, cls, phCls) {
     const icon = (CAT_META[m.category]?.icon ?? "🍗").slice(0, 2);
-    if (!m.image_url) return `<div class="${phCls}">${icon}</div>`;
+    if (!m.image_url) return `<div class="${phCls}"><span>${icon}</span><small>${itemName(m).split(" ").slice(0, 2).join(" ")}</small></div>`;
     return `<img class="${cls}" src="${m.image_url}" alt="" loading="lazy"
-      onerror="this.outerHTML='<div class=&quot;${phCls}&quot;>${icon}</div>'" />`;
+      onerror="this.outerHTML='<div class=&quot;${phCls}&quot;><span>${icon}</span></div>'" />`;
   }
 
   function renderGrid() {
     const items = S.byCat[S.activeCat] ?? [];
-    $("#menu-grid").innerHTML = items.map((m) => `
-      <button class="menu-card" data-id="${m.id}">
+    $("#menu-grid").innerHTML = items.map((m, i) => `
+      <button class="menu-card" data-id="${m.id}" style="animation-delay:${Math.min(i * 40, 300)}ms">
         ${imgTag(m, "mc-img", "mc-img-ph")}
         <span class="mc-body">
           <span class="mc-name">${itemName(m)}</span>
           <span class="mc-price-row"><span class="mc-price">${fmtVND(m.price)}</span><span class="mc-add">+</span></span>
         </span>
       </button>`).join("");
+  }
+
+  // ---------- camera check-in ----------
+  async function handlePhoto(file) {
+    const status = $("#camera-status");
+    const vf = $("#viewfinder");
+    const img = await fileToImage(file);
+    // show the shot in the viewfinder + scanline
+    $("#vf-content").innerHTML = `<img src="${img.thumb}" class="vf-photo" alt="" />`;
+    vf.classList.add("scanning");
+    status.textContent = t("camera_scanning");
+    postEvent("profile_photo", "camera check-in photo captured");
+    try {
+      const out = await api("/api/profile/photo", {
+        method: "POST",
+        body: { session_id: KFC.sessionId, image: img.full, thumb: img.thumb },
+      });
+      vf.classList.remove("scanning");
+      vf.classList.add("done");
+      status.textContent = t("camera_done");
+      postEvent("profile_ready", `hypothesis: ${(out.profile?.persona ?? "").slice(0, 60)}`);
+    } catch (_) {
+      status.textContent = t("camera_done");
+    }
+    setTimeout(() => show("ordertype"), 1100);
+  }
+
+  function fileToImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const image = new Image();
+        image.onload = () => {
+          const scale = (max) => {
+            const r = Math.min(1, max / Math.max(image.width, image.height));
+            const c = document.createElement("canvas");
+            c.width = Math.round(image.width * r);
+            c.height = Math.round(image.height * r);
+            c.getContext("2d").drawImage(image, 0, 0, c.width, c.height);
+            return c.toDataURL("image/jpeg", 0.75);
+          };
+          resolve({ full: scale(512), thumb: scale(120) });
+        };
+        image.onerror = reject;
+        image.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   // ---------- item modal ----------
@@ -191,12 +259,52 @@
     const { qty } = modalState;
     $("#im-price").textContent = fmtVND(modalUnit() * qty);
     $("#im-qty").textContent = qty;
-    $("#im-add").textContent = `${t("added").replace("Đã thêm vào đơn", "Thêm vào đơn").replace("Added to order", "Add to order")} · ${fmtVND(modalUnit() * qty)}`;
+    $("#im-add").textContent = `${t("add_to_order")} · ${fmtVND(modalUnit() * qty)}`;
   }
   function closeItem() {
     $("#item-backdrop").classList.add("hidden");
     $("#item-modal").classList.add("hidden");
     modalState = null;
+  }
+
+  // ---------- micro-interactions ----------
+  function flyToCart(sourceEl) {
+    try {
+      const img = sourceEl?.querySelector?.("img, .im-img-ph, .mc-img-ph") ?? sourceEl;
+      if (!img) return;
+      const from = img.getBoundingClientRect();
+      const to = $("#cart-bar").getBoundingClientRect();
+      const kioskBox = $("#kiosk").getBoundingClientRect();
+      const clone = img.cloneNode(true);
+      clone.className = "fly-clone";
+      Object.assign(clone.style, {
+        left: `${from.left - kioskBox.left}px`, top: `${from.top - kioskBox.top}px`,
+        width: `${from.width}px`, height: `${from.height}px`,
+      });
+      $("#fly-layer").appendChild(clone);
+      requestAnimationFrame(() => {
+        Object.assign(clone.style, {
+          left: `${(to.left || kioskBox.left + kioskBox.width / 2) - kioskBox.left + 20}px`,
+          top: `${(to.top || kioskBox.bottom - 80) - kioskBox.top}px`,
+          width: "36px", height: "36px", opacity: ".15", borderRadius: "50%",
+        });
+      });
+      setTimeout(() => clone.remove(), 650);
+    } catch (_) { /* decorative only */ }
+  }
+
+  function bumpCartBar() {
+    const bar = $("#cart-bar");
+    bar.classList.remove("bump");
+    void bar.offsetWidth;
+    bar.classList.add("bump");
+  }
+
+  function launchConfetti() {
+    const box = $("#confetti");
+    box.innerHTML = Array.from({ length: 36 }, (_, i) =>
+      `<i style="left:${Math.random() * 100}%;animation-delay:${Math.random() * .6}s;background:${["#E4002B", "#F2A900", "#2FBF71", "#fff"][i % 4]}"></i>`).join("");
+    setTimeout(() => { box.innerHTML = ""; }, 3200);
   }
 
   // ---------- cart ----------
@@ -206,6 +314,7 @@
     postEvent("add_to_cart", `${fromRec ? "[AI rec] " : ""}${m.name} ×${qty}`, { id: m.id, fromRec });
     if (!silent) toast(`✓ ${t("added")}: ${itemName(m)}`);
     updateCartBar();
+    bumpCartBar();
   }
 
   function cartSubtotal() {
@@ -267,18 +376,49 @@
       <div class="sum-row total"><span>${t("total")}</span><span>${fmtVND(sub - disc)}</span></div>`;
   }
 
-  // ---------- recommendations (P2) ----------
-  async function showRecSheet() {
-    const cart = S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty }));
+  // ---------- recommendations (P2 + persona) ----------
+  function startThinking() {
+    $("#rec-items").innerHTML = "";
+    $("#rec-thinking").classList.remove("hidden");
+    const lines = t("thinking");
+    let i = 0;
+    const el = $("#rec-status");
+    el.textContent = lines[0];
+    clearInterval(S.thinkTimer);
+    S.thinkTimer = setInterval(() => {
+      i = (i + 1) % lines.length;
+      el.style.opacity = 0;
+      setTimeout(() => { el.textContent = lines[i]; el.style.opacity = 1; }, 180);
+    }, 850);
+  }
+  function stopThinking() {
+    clearInterval(S.thinkTimer);
+    $("#rec-thinking").classList.add("hidden");
+  }
+
+  async function showRecSheet(anchorItem, qty) {
+    // open instantly with the thinking state — the wait IS part of the show
+    $("#rec-backdrop").classList.remove("hidden");
+    $("#rec-sheet").classList.remove("hidden");
+    startThinking();
     postEvent("rec_request", "kiosk asks rec engine (item added)");
+
+    // 1) tell the profiler what just happened (fast model, sharpens the guess)
+    const sharing = (anchorItem?.tags ?? "").includes("sharing");
+    await observe(`added ${qty}× ${anchorItem?.name ?? "item"}${sharing ? " (a sharing/group-size item)" : ""}, order type: ${S.orderType ?? "?"}`);
+
+    // 2) then ask the engine — it now sees the refreshed hypothesis
+    const cart = S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty }));
     try {
-      const data = await api("/api/recommend", { method: "POST", body: { session_id: sessionId, cart, trigger: "item_added" } });
+      const data = await api("/api/recommend", { method: "POST", body: { session_id: KFC.sessionId, cart, trigger: "item_added" } });
       const items = (data.items ?? []).slice(0, 3);
-      if (!items.length) return;
+      stopThinking();
+      if (!items.length && !data.smart_swap) { closeRecSheet(false); return; }
       S.recSheetItems = items;
-      postEvent("rec_shown", `AI suggests: ${items.map((i) => i.name).join(", ")}`);
-      $("#rec-items").innerHTML = items.map((r) => `
-        <div class="rec-item">
+      S.pendingSwap = data.smart_swap ?? null;
+      postEvent("rec_shown", `AI suggests: ${items.map((i) => i.name).join(", ")}${data.smart_swap ? ` + swap→${data.smart_swap.name}` : ""}`);
+      $("#rec-items").innerHTML = (data.smart_swap ? swapCardHTML(data.smart_swap) : "") + items.map((r, i) => `
+        <div class="rec-item" style="animation-delay:${i * 90}ms">
           ${imgTag(r, "ri-img", "ri-img-ph")}
           <span class="ri-body">
             <span class="ri-name">${S.lang === "en" && r.name_en ? r.name_en : r.name}</span>
@@ -287,28 +427,38 @@
           </span>
           <button class="ri-add" data-id="${r.id}">+ ${S.lang === "vi" ? "Thêm" : "Add"}</button>
         </div>`).join("");
-      $("#rec-backdrop").classList.remove("hidden");
-      $("#rec-sheet").classList.remove("hidden");
-    } catch (_) { /* rec failure never blocks ordering */ }
+    } catch (_) {
+      stopThinking();
+      closeRecSheet(false);
+    }
   }
 
   function closeRecSheet(dismissed) {
+    stopThinking();
     $("#rec-backdrop").classList.add("hidden");
     $("#rec-sheet").classList.add("hidden");
     if (dismissed) {
-      api("/api/rec-feedback", { method: "POST", body: { session_id: sessionId, dismissed: true } });
+      api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, dismissed: true } });
+      observe("dismissed the AI suggestions without adding any");
       postEvent("rec_dismissed", "customer dismissed AI suggestions");
     }
   }
 
   async function loadCartRecs() {
     const cart = S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty }));
+    $("#cart-recs").innerHTML = `<div class="rec-strip-title"><span class="ai-badge">✦ AI</span> <span class="rec-strip-loading">${t("thinking")[0]}</span></div>`;
     try {
-      const data = await api("/api/recommend", { method: "POST", body: { session_id: sessionId, cart, trigger: "cart_review" } });
+      const data = await api("/api/recommend", { method: "POST", body: { session_id: KFC.sessionId, cart, trigger: "cart_review" } });
       const items = (data.items ?? []).slice(0, 3);
-      if (!items.length) { $("#cart-recs").innerHTML = ""; return; }
+      S.pendingSwap = data.smart_swap ?? null;
+      if (!items.length && !data.smart_swap) { $("#cart-recs").innerHTML = ""; return; }
       postEvent("rec_shown", `cart review AI strip: ${items.map((i) => i.name).join(", ")}`);
       $("#cart-recs").innerHTML = `
+        ${data.smart_swap ? `<div class="swap-banner">
+          <span class="swap-tag">💛 ${data.smart_swap.delta < 0 ? (S.lang === "vi" ? "TIẾT KIỆM " + fmtVND(-data.smart_swap.delta) : "SAVE " + fmtVND(-data.smart_swap.delta)) : data.smart_swap.delta_display}</span>
+          <span class="swap-msg">${S.lang === "vi" ? data.smart_swap.message_vn : data.smart_swap.message_en}</span>
+          <button class="ri-add swap-accept">↻ ${S.lang === "vi" ? "Đổi" : "Swap"}</button>
+        </div>` : ""}
         <div class="rec-strip-title"><span class="ai-badge">✦ AI</span> ${t("rec_title")}</div>
         <div class="rec-strip">${items.map((r) => `
           <button class="rs-card" data-id="${r.id}">
@@ -317,15 +467,54 @@
             <div class="rs-price">+ ${r.price_display}</div>
           </button>`).join("")}</div>`;
       S.recSheetItems = items;
-    } catch (_) { /* non-blocking */ }
+    } catch (_) { $("#cart-recs").innerHTML = ""; }
+  }
+
+  // kindness-first: money-saving combo swap card (trust before upsell)
+  function swapCardHTML(sw) {
+    const msg = S.lang === "vi" ? sw.message_vn : sw.message_en;
+    const saveTag = sw.delta < 0
+      ? (S.lang === "vi" ? `TIẾT KIỆM ${fmtVND(-sw.delta)}` : `SAVE ${fmtVND(-sw.delta)}`)
+      : (S.lang === "vi" ? `THÊM MÓN ${sw.delta_display}` : `MORE FOOD ${sw.delta_display}`);
+    return `
+      <div class="rec-item swap-item">
+        <span class="swap-tag">💛 ${saveTag}</span>
+        ${imgTag(sw, "ri-img", "ri-img-ph")}
+        <span class="ri-body">
+          <span class="ri-name">${S.lang === "en" && sw.name_en ? sw.name_en : sw.name}</span>
+          <div class="ri-pitch">${msg}</div>
+          <div class="ri-price">${sw.price_display}</div>
+        </span>
+        <button class="ri-add swap-accept">↻ ${S.lang === "vi" ? "Đổi" : "Swap"}</button>
+      </div>`;
+  }
+
+  function performSwap() {
+    const sw = S.pendingSwap;
+    if (!sw) return;
+    for (const rep of sw.replaces) {
+      const idx = S.cart.findIndex((l) => l.item.id === rep.id);
+      if (idx >= 0) {
+        if (S.cart[idx].qty > 1) S.cart[idx].qty -= 1;
+        else S.cart.splice(idx, 1);
+      }
+    }
+    const combo = S.menu.find((x) => x.id === sw.id);
+    if (combo) addToCart(combo, 1, [], true);
+    api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, accepted_item_id: sw.id } });
+    observe(`accepted the money-saving combo swap to ${sw.name} (trusts the assistant)`);
+    postEvent("rec_accepted", `kindness-first swap accepted: ${sw.name} (${sw.delta_display})`, { id: sw.id });
+    toast(sw.delta < 0 ? `💛 ${S.lang === "vi" ? "Đã tiết kiệm" : "Saved"} ${fmtVND(-sw.delta)}!` : `✓ ${t("added")}: ${sw.name}`);
+    S.pendingSwap = null;
+    if (S.screen === "cart") renderCart();
   }
 
   function acceptRec(id) {
-    const r = S.recSheetItems.find((x) => x.id === id);
     const m = S.menu.find((x) => x.id === id);
     if (!m) return;
     addToCart(m, 1, (m.modifiers ? JSON.parse(m.modifiers) : []).map(() => 0), true);
-    api("/api/rec-feedback", { method: "POST", body: { session_id: sessionId, accepted_item_id: id } });
+    api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, accepted_item_id: id } });
+    observe(`ACCEPTED the AI suggestion: ${m.name} (${m.category})`);
     postEvent("rec_accepted", `customer accepted AI rec: ${m.name}`, { id });
     if (S.screen === "cart") renderCart();
   }
@@ -351,7 +540,7 @@
     const out = await api("/api/order", {
       method: "POST",
       body: {
-        session_id: sessionId, items, order_type: S.orderType,
+        session_id: KFC.sessionId, items, order_type: S.orderType,
         promo_code: S.voucher?.code, loyalty_phone: S.loyalty?.phone, rec_item_ids: recIds,
       },
     });
@@ -359,7 +548,6 @@
     S.lastOrder = out.order;
     renderConfirm();
     show("confirm");
-    // reset cart state (keep session)
     S.cart = []; S.voucher = null;
     updateCartBar();
     pollOrderStatus();
@@ -393,132 +581,28 @@
     }, 3000);
   }
 
-  // ---------- chat (P4) ----------
-  function openChat() {
-    S.chatOpen = true;
-    $("#chat-panel").classList.remove("hidden");
-    $("#chat-fab").classList.add("hidden");
-    renderChatSuggests();
-    if (!S.chatHistory.length) {
-      pushMsg("agent", S.lang === "vi"
-        ? "Xin chào! Mình là trợ lý AI của KFC. Bạn muốn ăn gì hôm nay? 🍗"
-        : "Hi! I'm KFC's AI assistant. What are you craving today? 🍗", false);
-    }
-    postEvent("tap", "opened AI chat assistant");
-  }
-  function closeChat() {
-    S.chatOpen = false;
-    $("#chat-panel").classList.add("hidden");
-    if (["menu", "cart", "payment"].includes(S.screen)) $("#chat-fab").classList.remove("hidden");
-  }
-
-  function renderChatSuggests() {
-    $("#chat-suggest").innerHTML = t("chat_suggests").map((s) => `<button class="cs-chip">${s}</button>`).join("");
-  }
-
-  function pushMsg(role, content, record = true) {
-    const who = role === "agent" ? `<span class="who">✦ ${t("agent_name")}</span>` : role === "staff" ? `<span class="who">👤 ${t("staff_name")}</span>` : "";
-    const div = document.createElement("div");
-    div.className = `msg ${role}`;
-    const safe = content.replace(/</g, "&lt;")
-      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")   // the model loves bold — render it
-      .replace(/^#+\s*/gm, "");
-    div.innerHTML = who + safe;
-    $("#chat-msgs").appendChild(div);
-    $("#chat-msgs").scrollTop = 1e9;
-    if (record && (role === "user" || role === "agent")) S.chatHistory.push({ role: role === "agent" ? "assistant" : "user", content });
-  }
-
-  async function sendChat(text) {
-    if (!text.trim()) return;
-    pushMsg("user", text);
-    const typing = document.createElement("div");
-    typing.className = "msg typing";
-    typing.textContent = "…";
-    $("#chat-msgs").appendChild(typing);
-    $("#chat-msgs").scrollTop = 1e9;
-
-    const cart = S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty, name: l.item.name }));
-    try {
-      const out = await api("/api/chat", {
-        method: "POST",
-        body: { session_id: sessionId, messages: S.chatHistory.slice(-10), cart },
-      });
-      typing.remove();
-      if (out.handoff) { enterHandoffMode(); return; }
-      if (out.reply) pushMsg("agent", out.reply);
-      for (const e of out.effects ?? []) applyEffect(e);
-    } catch (err) {
-      typing.remove();
-      pushMsg("agent", S.lang === "vi" ? "Xin lỗi, có lỗi nhỏ. Bạn thử lại nhé!" : "Sorry, something hiccuped. Try again!");
-    }
-  }
-
-  function applyEffect(e) {
-    if (e.type === "add_to_cart") {
-      const m = S.menu.find((x) => x.id === e.payload.item.id);
-      if (m) { addToCart(m, e.payload.quantity ?? 1, (m.modifiers ? JSON.parse(m.modifiers) : []).map(() => 0), false, true); toast(`✓ ${t("added")}: ${itemName(m)}`); }
-      if (S.screen === "cart") renderCart();
-    } else if (e.type === "order_confirmed") {
-      S.lastOrder = e.payload;
-      S.cart = []; S.voucher = null;
-      updateCartBar();
-      closeChat();
-      renderConfirm();
-      show("confirm");
-      pollOrderStatus();
-    } else if (e.type === "voucher_applied") {
-      const p = S.promos.find((x) => x.code === e.payload.code);
-      if (p) { S.voucher = p; if (S.screen === "cart") renderSummary(); }
-      toast(`🎟 ${e.payload.code} −${e.payload.discount_display}`);
-    } else if (e.type === "handoff") {
-      enterHandoffMode(e.payload?.staff?.name);
-    }
-  }
-
-  // ---------- human-in-the-loop ----------
-  function enterHandoffMode(staffName) {
-    if (S.handoff) return;
-    S.handoff = true;
-    $("#chat-handoff").classList.remove("hidden");
-    $("#chat-handoff").textContent = t("handoff_banner") + (staffName ? ` — ${staffName}` : "");
-    postEvent("handoff", `session routed to human staff${staffName ? `: ${staffName}` : ""}`);
-    startChatPoll();
-  }
-  function exitHandoffMode() {
-    S.handoff = false;
-    $("#chat-handoff").classList.add("hidden");
-    clearInterval(S.chatPollTimer);
-  }
-  function startChatPoll() {
-    clearInterval(S.chatPollTimer);
-    S.chatPollTimer = setInterval(async () => {
-      try {
-        const out = await api(`/api/chat/poll?session_id=${sessionId}&after=${S.chatPollCursor}`);
-        for (const m of out.messages ?? []) {
-          S.chatPollCursor = Math.max(S.chatPollCursor, m.id);
-          if (m.role === "staff") { pushMsg("staff", m.content, false); postEvent("staff_reply", "staff replied to customer"); }
-        }
-        if (out.handoff && out.handoff.status === "resolved") {
-          exitHandoffMode();
-          pushMsg("agent", S.lang === "vi" ? "Mình là trợ lý AI, tiếp tục hỗ trợ bạn nhé!" : "AI assistant back with you!", false);
-        }
-      } catch (_) { /* keep polling */ }
-    }, 2500);
-  }
-
-  // prime the poll cursor so old messages don't replay
-  api(`/api/chat/poll?session_id=${sessionId}&after=0`).then((out) => {
-    for (const m of out.messages ?? []) S.chatPollCursor = Math.max(S.chatPollCursor, m.id);
-    if (out.handoff && ["pending", "active"].includes(out.handoff.status)) enterHandoffMode();
-  }).catch(() => {});
-
   // ---------- events ----------
   document.addEventListener("click", (ev) => {
     const btn = ev.target.closest("button");
     if (!btn) return;
-    if (btn.id === "btn-start") { S.orderType = null; show("ordertype"); }
-    else if (btn.classList.contains("ordertype-card")) { S.orderType = btn.dataset.type; postEvent("tap", `order type: ${S.orderType}`); show("menu"); }
+    if (btn.id === "btn-start") {
+      KFC.rotateSession();               // new customer, new hypothesis
+      S.orderType = null; S.cart = []; S.voucher = null; S.loyalty = null;
+      updateCartBar();
+      $("#vf-content").innerHTML = `<span class="vf-icon">📷</span><span class="vf-hint">${t("camera_hint")}</span>`;
+      $("#viewfinder").classList.remove("scanning", "done");
+      $("#camera-status").textContent = "";
+      $("#camera-input").value = "";
+      postEvent("session_start", "new customer session");
+      show("camera");
+    }
+    else if (btn.id === "btn-camera-skip") { observe("skipped the camera check-in"); show("ordertype"); }
+    else if (btn.classList.contains("ordertype-card")) {
+      S.orderType = btn.dataset.type;
+      postEvent("tap", `order type: ${S.orderType}`);
+      observe(`chose order type: ${S.orderType}`);
+      show("menu");
+    }
     else if (btn.classList.contains("cat-btn")) { S.activeCat = btn.dataset.cat; renderCats(); renderGrid(); postEvent("tap", `category: ${btn.dataset.cat}`); }
     else if (btn.classList.contains("menu-card")) openItem(Number(btn.dataset.id));
     else if (btn.id === "im-close") closeItem();
@@ -532,11 +616,13 @@
     }
     else if (btn.id === "im-add") {
       const { m, qty, sel } = modalState;
+      flyToCart($("#item-modal"));
       addToCart(m, qty, sel);
       closeItem();
-      showRecSheet();
+      showRecSheet(m, qty);
     }
     else if (btn.id === "rec-close" || btn.id === "rec-skip") closeRecSheet(true);
+    else if (btn.classList.contains("swap-accept")) { performSwap(); closeRecSheet(false); }
     else if (btn.classList.contains("ri-add") || btn.classList.contains("rs-card")) {
       acceptRec(Number(btn.dataset.id));
       if (btn.classList.contains("ri-add")) closeRecSheet(false);
@@ -546,23 +632,29 @@
     else if (btn.id === "btn-checkout") { $("#pay-total").textContent = fmtVND(cartSubtotal() - voucherDiscount(cartSubtotal())); $("#pay-methods").classList.remove("hidden"); $("#pay-qr").classList.add("hidden"); show("payment"); }
     else if (btn.classList.contains("pay-card")) placeOrder(btn.dataset.method);
     else if (btn.id === "btn-back-cart") show("cart");
-    else if (btn.id === "btn-new-order") { show("attract"); }
+    else if (btn.id === "btn-new-order") show("attract");
     else if (btn.id === "btn-home") { if (S.screen !== "attract") show(S.cart.length ? "menu" : "attract"); }
-    else if (btn.id === "btn-lang") { S.lang = S.lang === "vi" ? "en" : "vi"; applyI18n(); renderCats(); renderGrid(); renderDaypartBanner(); renderChatSuggests(); if (S.screen === "cart") renderCart(); postEvent("tap", `language → ${S.lang}`); }
-    else if (btn.id === "chat-fab") openChat();
-    else if (btn.id === "chat-close") closeChat();
-    else if (btn.classList.contains("cs-chip")) { sendChat(btn.textContent); }
+    else if (btn.id === "btn-lang") { S.lang = S.lang === "vi" ? "en" : "vi"; applyI18n(); renderCats(); renderGrid(); renderDaypartBanner(); if (S.screen === "cart") renderCart(); postEvent("tap", `language → ${S.lang}`); }
     else if (btn.id === "btn-voucher") applyVoucherUI();
     else if (btn.id === "btn-loyalty") checkLoyaltyUI();
   });
 
+  $("#camera-input").addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (file) handlePhoto(file).catch(() => show("ordertype"));
+  });
   $("#item-backdrop").addEventListener("click", closeItem);
   $("#rec-backdrop").addEventListener("click", () => closeRecSheet(true));
-  $("#chat-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const input = $("#chat-input");
-    sendChat(input.value);
-    input.value = "";
+
+  document.addEventListener("click", (ev) => {
+    const qbtn = ev.target.closest(".cl-qbtn");
+    if (!qbtn) return;
+    const line = S.cart[Number(qbtn.dataset.i)];
+    if (!line) return;
+    line.qty += Number(qbtn.dataset.d);
+    if (line.qty <= 0) S.cart.splice(Number(qbtn.dataset.i), 1);
+    updateCartBar();
+    renderCart();
   });
 
   async function applyVoucherUI() {
@@ -595,12 +687,18 @@
       S.loyalty = out.member;
       msg.className = "extra-msg ok";
       msg.textContent = "✓ " + t("loyalty_ok", out.member.name, out.member.points, out.member.tier);
+      observe(`identified as loyalty member, tier: ${out.member.tier}`);
     } else {
       S.loyalty = null;
       msg.className = "extra-msg err";
       msg.textContent = "✗ " + t("loyalty_bad");
     }
   }
+
+  // scenario director (desktop view) nudges us to reload context
+  window.addEventListener("message", (ev) => {
+    if (ev.data?.kfcScenario) { loadMenu().catch(() => {}); if (S.screen === "cart") renderCart(); }
+  });
 
   // ---------- boot ----------
   applyI18n();

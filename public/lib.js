@@ -4,11 +4,18 @@ window.KFC = (() => {
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   const fmtVND = (n) => (n ?? 0).toLocaleString("vi-VN") + "₫";
 
-  const sessionId = (() => {
+  let sessionId = (() => {
     let id = localStorage.getItem("kfc_session");
     if (!id) { id = "s-" + Math.random().toString(36).slice(2, 12); localStorage.setItem("kfc_session", id); }
     return id;
   })();
+
+  // each customer journey gets its own session (profiles are per-customer)
+  function rotateSession() {
+    sessionId = "s-" + Math.random().toString(36).slice(2, 12);
+    localStorage.setItem("kfc_session", sessionId);
+    return sessionId;
+  }
 
   async function api(path, opts = {}) {
     const res = await fetch(path, {
@@ -45,5 +52,5 @@ window.KFC = (() => {
     late: { vi: "Đêm muộn", en: "Late night", icon: "🌙" },
   };
 
-  return { $, $$, fmtVND, sessionId, api, postEvent, CAT_META, DAYPART_META };
+  return { $, $$, fmtVND, get sessionId() { return sessionId; }, rotateSession, api, postEvent, CAT_META, DAYPART_META };
 })();

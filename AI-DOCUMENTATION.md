@@ -7,9 +7,24 @@ solution. Agentic AI is the CORE of this build, not a supporting feature.*
 
 | Model | Where it runs | Role |
 |---|---|---|
-| **OpenAI gpt-oss-120b** | Cloudflare Workers AI (`@cf/openai/gpt-oss-120b`, Responses API) | The ordering agent's reasoning + tool-calling loop (P4), and the recommendation pitch writer (P2) |
+| **meta llama-3.2-11b-vision-instruct** | Cloudflare Workers AI (llava-1.5-7b fallback) | Camera-glance customer profiling at check-in: coarse, non-identifying attributes only |
+| **meta llama-3.1-8b-instruct-fast** | Cloudflare Workers AI (~1.3s/turn) | Continuous hypothesis refinement from every kiosk interaction (chosen for speed — the guess must update between taps) |
+| **OpenAI gpt-oss-120b** | Cloudflare Workers AI (`@cf/openai/gpt-oss-120b`, Responses API) | The ordering agent's reasoning + tool-calling loop (P4), and the persona-aware recommendation pitch writer (P2) |
 | **meta llama-3.3-70b-instruct-fp8-fast** | Cloudflare Workers AI | Fallback agent model (set `WA_MODEL` to switch); validated end-to-end |
 | **OpenAI gpt-4.1-mini** | OpenAI API (optional) | Drop-in primary if `OPENAI_API_KEY` secret is set — the code carries a dual adapter |
+
+## 0. The customer hypothesis agent (`src/profiler.ts`)
+
+The system **guesses, never assumes**: a vision glance at check-in produces coarse bands
+(age band / attire / group — "unclear" when not visible, verified: it answers "unclear"
+rather than hallucinating), then a fast text model merges every behavioral observation
+("added a 4-person bucket", "dismissed the suggestions", "loyalty gold member") into an
+evolving persona + per-category bias + confidence. That bias is the rec engine's 8th signal,
+weighted by confidence. The whole hypothesis — photo thumb, persona sentence, evidence trail,
+bias bars — streams to the ops view in real time via telemetry. **Kindness-first strategy:**
+before any upsell, the engine searches for combos that cover the customer's hand-picked items
+for less money and offers the swap first — trust-building as an explicit sales policy, and
+combo contents are machine-readable so suggestions never duplicate what a combo already includes.
 
 ## 1. The ordering agent (P4) — `src/agent.ts`
 

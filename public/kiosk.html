@@ -20,7 +20,26 @@
         <button class="attract-cta" id="btn-start">
           <span data-i18n="tap_to_start">Chạm để bắt đầu</span>
         </button>
-        <div class="attract-ai">✦ <span data-i18n="attract_ai">Trợ lý AI gợi ý món hợp khẩu vị</span></div>
+        <div class="attract-ai">✦ <span data-i18n="attract_ai">AI gợi ý món hợp khẩu vị riêng bạn</span></div>
+      </div>
+    </section>
+
+    <!-- CAMERA CHECK-IN (demo: photo upload stands in for the camera) -->
+    <section id="screen-camera" class="screen">
+      <div class="camera-inner">
+        <h2 class="u-display" data-i18n="camera_title">Nhìn vào camera nhé!</h2>
+        <p class="camera-sub" data-i18n="camera_sub">AI nhìn một thoáng để gợi ý món hợp với bạn hơn — không lưu ảnh, không nhận diện danh tính.</p>
+        <label class="viewfinder" id="viewfinder">
+          <input type="file" id="camera-input" accept="image/*" hidden />
+          <div class="vf-corners"><i></i><i></i><i></i><i></i></div>
+          <div class="vf-content" id="vf-content">
+            <span class="vf-icon">📷</span>
+            <span class="vf-hint" data-i18n="camera_hint">Demo: chạm để tải ảnh lên</span>
+          </div>
+          <div class="vf-scanline" id="vf-scanline"></div>
+        </label>
+        <div class="camera-status" id="camera-status"></div>
+        <button class="camera-skip" id="btn-camera-skip" data-i18n="skip">Bỏ qua →</button>
       </div>
     </section>
 
@@ -98,6 +117,7 @@
 
     <!-- CONFIRM -->
     <section id="screen-confirm" class="screen">
+      <div class="confetti" id="confetti"></div>
       <div class="confirm-inner">
         <div class="confirm-check">✓</div>
         <h2 class="u-display" data-i18n="order_placed">Đặt món thành công!</h2>
@@ -131,25 +151,14 @@
         <span id="rec-title" data-i18n="rec_title">Thường được gọi kèm</span>
         <button class="rec-close" id="rec-close">✕</button>
       </div>
+      <div class="rec-thinking hidden" id="rec-thinking">
+        <div class="rec-skeleton"><i></i><span><b></b><b class="short"></b></span></div>
+        <div class="rec-skeleton"><i></i><span><b></b><b class="short"></b></span></div>
+        <div class="rec-skeleton"><i></i><span><b></b><b class="short"></b></span></div>
+        <div class="rec-status" id="rec-status"></div>
+      </div>
       <div class="rec-items" id="rec-items"></div>
       <button class="rec-skip" id="rec-skip" data-i18n="no_thanks">Không, cảm ơn</button>
-    </div>
-
-    <!-- chat assistant -->
-    <button class="chat-fab hidden" id="chat-fab"><span class="ai-badge-round">✦</span><span data-i18n="chat_fab">Trợ lý AI</span></button>
-    <div class="chat-panel hidden" id="chat-panel">
-      <div class="chat-head">
-        <span class="ai-badge">✦ AI</span>
-        <span id="chat-title" data-i18n="chat_title">KFC Trợ Lý — đặt món bằng lời</span>
-        <button class="chat-close" id="chat-close">✕</button>
-      </div>
-      <div class="chat-handoff hidden" id="chat-handoff"></div>
-      <div class="chat-msgs" id="chat-msgs"></div>
-      <div class="chat-suggest" id="chat-suggest"></div>
-      <form class="chat-inputrow" id="chat-form">
-        <input id="chat-input" placeholder="Nhắn gì đó… / Type here…" autocomplete="off" />
-        <button type="submit" class="chat-send">➤</button>
-      </form>
     </div>
 
     <!-- item detail modal -->
@@ -157,6 +166,7 @@
     <div class="item-modal hidden" id="item-modal"></div>
 
     <div class="toast" id="toast"></div>
+    <div class="fly-layer" id="fly-layer"></div>
   </div>
 
   <script src="/lib.js"></script>

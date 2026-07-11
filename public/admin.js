@@ -584,6 +584,7 @@
     daypart:      { vi: "Khung giờ trong ngày",  en: "Daypart", desc: "Ưu tiên món phù hợp với buổi sáng, trưa, xế hay tối." },
     promo:        { vi: "Khuyến mãi đang chạy",  en: "Promotions", desc: "Ưu tiên gợi ý các món đang có chương trình giảm giá." },
     inventory:    { vi: "Tồn kho cửa hàng",      en: "Inventory posture", desc: "Đẩy món đang dư hàng, tự bảo vệ món sắp hết — không bao giờ gợi ý món đã hết." },
+    persona:      { vi: "Chân dung khách (AI đoán)", en: "Customer hypothesis", desc: "AI nhìn thoáng qua camera + thao tác trên kiosk để đoán khách là ai và đang muốn gì." },
     margin:       { vi: "Biên lợi nhuận",        en: "Margin", desc: "Ưu tiên nhẹ những món mang lại lợi nhuận tốt hơn cho cửa hàng." },
     popularity:   { vi: "Độ phổ biến",           en: "Popularity", desc: "Ưu tiên những món bán chạy nhất tại cửa hàng." },
   };

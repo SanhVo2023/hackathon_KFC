@@ -163,6 +163,46 @@ function guessTags(cat, name, desc) {
   return [...new Set(tags)];
 }
 
+// image backfill: second TinyFish crawl (name → image_url) fills curated gaps
+function loadImageCrawl() {
+  const p = join(here, "crawl-images.json");
+  if (!existsSync(p)) return [];
+  let raw = readFileSync(p, "utf8");
+  if ((raw.match(/Ã[-¿ -ÿ]/g) || []).length > 20) raw = Buffer.from(raw, "latin1").toString("utf8");
+  const line = raw.split(/\r?\n/).find((l) => l.trim().startsWith('{"status"'));
+  if (!line) return [];
+  try {
+    const parsed = JSON.parse(line);
+    return parsed.status === "COMPLETED" ? (parsed.result?.items ?? []) : [];
+  } catch { return []; }
+}
+const imageMap = loadImageCrawl().filter((i) => i.image_url).map((i) => ({ key: fold(i.name), url: i.image_url }));
+let filled = 0;
+for (const item of catalog) {
+  if (item.image_url) continue;
+  const key = fold(item.name).replace(/\s*\((vua|lon|l|r)\)\s*/g, " ").trim();
+  const hit = imageMap.find((m) => m.key.includes(key) || key.includes(m.key) ||
+    key.split(" ").filter((w) => w.length > 3).every((w) => m.key.includes(w)));
+  if (hit) { item.image_url = hit.url; filled++; }
+}
+console.log(`image backfill: ${filled} curated items matched from crawl (${imageMap.length} crawled images)`);
+
+// combo contents: which categories a combo already includes (so the engine
+// never recommends a cola on top of a combo that has one)
+const CONTENT_TOKENS = [
+  [/pepsi|7up|mirinda|aquafina|nuoc|1 ly|2 ly|4 ly|lipton|tra /, "drink"],
+  [/khoai tay|salad|pho mai|sup/, "snack"],
+  [/kem |banh trung/, "dessert"],
+  [/mieng ga|ga ran|tenders|canh ga|popcorn|ga quay|ga lac/, "chicken"],
+  [/burger|com ga|mi y/, "burger-rice"],
+];
+for (const item of catalog) {
+  if (!item.is_combo) continue;
+  const hay = fold(`${item.name} ${item.description ?? ""}`);
+  const covered = CONTENT_TOKENS.filter(([re]) => re.test(hay)).map(([, c]) => c);
+  item.combo_contents = covered.length ? JSON.stringify(covered) : null;
+}
+
 console.log(`catalog total: ${catalog.length}`);
 
 // ---------- 3. promotions (daypart/dow aware) ----------
@@ -345,8 +385,8 @@ const STAFF = [
   ["Quản lý Ca", "manager", 0],
 ];
 const SETTINGS = {
-  signals: { cooccurrence: true, affinity: true, daypart: true, promo: true, inventory: true, margin: true, popularity: true },
-  weights: { cooccurrence: 0.3, affinity: 0.15, daypart: 0.15, promo: 0.15, inventory: 0.1, margin: 0.1, popularity: 0.05 },
+  signals: { cooccurrence: true, affinity: true, daypart: true, promo: true, inventory: true, persona: true, margin: true, popularity: true },
+  weights: { cooccurrence: 0.25, affinity: 0.12, daypart: 0.13, promo: 0.13, inventory: 0.1, persona: 0.15, margin: 0.07, popularity: 0.05 },
   rec_slots: 3,
   llm_pitch: true,
   model: "workers-ai",
@@ -423,7 +463,7 @@ for (const i of catalog) {
   const keywords = fold(`${i.name} ${i.name_en ?? ""} ${i.description ?? ""} ${i.category}`);
   lines.push(
     `INSERT INTO menu_items (id,sku,name,name_en,category,description,price,image_url,is_combo,combo_contents,modifiers,tags,keywords,available,margin_pct,popularity) VALUES (` +
-    `${i.id},${esc("KFC-" + String(i.id).padStart(3, "0"))},${esc(i.name)},${esc(i.name_en)},${esc(i.category)},${esc(i.description)},${i.price},${esc(i.image_url)},${i.is_combo},NULL,${esc(i.modifiers)},${esc(i.tags)},${esc(keywords)},1,${i.margin},${i.pop.toFixed(2)});`,
+    `${i.id},${esc("KFC-" + String(i.id).padStart(3, "0"))},${esc(i.name)},${esc(i.name_en)},${esc(i.category)},${esc(i.description)},${i.price},${esc(i.image_url)},${i.is_combo},${esc(i.combo_contents ?? null)},${esc(i.modifiers)},${esc(i.tags)},${esc(keywords)},1,${i.margin},${i.pop.toFixed(2)});`,
   );
 }
 for (const p of PROMOS) {
