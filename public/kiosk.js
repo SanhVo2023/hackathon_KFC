@@ -94,10 +94,17 @@
     el._t = setTimeout(() => el.classList.remove("show"), 1800);
   }
 
-  // background behavior signal to the profiler — never awaited, never blocking
+  // background behavior signal to the profiler — never awaited, never blocking.
+  // Every observation carries the LIVE CART so the hypothesis knows what the
+  // customer already has (a 500k bucket in the basket changes what they want).
   function observe(observation) {
+    let full = observation;
+    if (S.cart.length) {
+      const lines = S.cart.map((l) => `${l.qty}× ${l.item.name}`).join(", ");
+      full += ` | cart already holds: ${lines} — total ${fmtVND(cartSubtotal())}`;
+    }
     postEvent("profile_signal", observation);
-    api("/api/profile/event", { method: "POST", body: { session_id: KFC.sessionId, observation } }).catch(() => null);
+    api("/api/profile/event", { method: "POST", body: { session_id: KFC.sessionId, observation: full } }).catch(() => null);
   }
 
   // ---------- navigation ----------

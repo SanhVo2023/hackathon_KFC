@@ -160,6 +160,7 @@ export async function refineProfile(
 Current hypothesis: ${JSON.stringify({ visual: existing.visual, persona: existing.persona, category_bias: existing.category_bias, confidence: existing.confidence })}
 Observations so far (newest last): ${JSON.stringify(existing.evidence.slice(-6))}
 Rules: a 4+ portion / sharing / bucket order suggests a group or family → desserts and large drinks appeal. A single fast combo at lunch on a weekday suggests a worker in a hurry → drinks, quick add-ons. Late night singles → snacks. Update the hypothesis; RAISE confidence only when evidence agrees. It is a guess — phrase persona as a hypothesis.
+CART-AWARENESS (critical): observations may include "cart already holds: ...". category_bias means WHAT TO SUGGEST NEXT, not who they are. Never bias toward what the cart already covers — if it already holds a bucket/combo or a big order, set combo bias near 0 and shift "wants" to what would COMPLETE the meal (dessert to close it, a missing drink, a small side). A full-looking cart may want nothing more — say so.
 Return ONLY JSON: {"persona":"one short sentence","wants":"one short sentence","category_bias":{"combo":0.0,"chicken":0.0,"burger-rice":0.0,"snack":0.0,"drink":0.0,"dessert":0.0},"confidence":0.0,"reasoning":"one short sentence"}`;
 
   let parsed: Record<string, unknown> | null = null;

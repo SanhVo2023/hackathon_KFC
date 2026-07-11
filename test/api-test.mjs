@@ -321,6 +321,21 @@ let recItemIds = [];
   check(`full-menu crawl live (menu ≥ 90 items, got ${menu.length})`, menu.length >= 90);
 }
 
+// 15c2. meal completion: a big bucket in the cart must NEVER get another bundle
+{
+  const bucket = menu.filter((m) => m.is_combo && m.price >= 150000).sort((a, b) => b.price - a.price)[0];
+  const r = await api("/api/recommend", {
+    method: "POST",
+    body: JSON.stringify({ session_id: SESSION, cart: [{ item_id: bucket.id, qty: 1 }], trigger: "cart_review" }),
+  });
+  const items = r.body.items ?? [];
+  check(`bucket cart (${bucket.name}) gets no second bundle`, items.every((i) => i.category !== "combo"),
+    items.map((i) => `${i.name}(${i.category})`).join(", "));
+  check("bucket cart gets small complements only (≤60k)", items.every((i) => i.price <= 60000),
+    items.map((i) => `${i.name} ${i.price}`).join(", "));
+  console.log(`     complete-the-meal picks: ${items.map((i) => `${i.name}→${i.strategy}`).join(" | ") || "(meal complete, nothing pushed)"}`);
+}
+
 // 15d. ops-panel probe: instant, and never pollutes acceptance metrics
 {
   const before = await api("/api/admin/metrics");

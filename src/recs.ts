@@ -146,7 +146,17 @@ export async function recommend(
   const activePromos = promos.filter((p) => promoApplies(p, daypart, dow));
 
   const subtotal = cartItems.reduce((s, i) => s + i.price * (cart.find((c) => c.item_id === i.id)?.qty ?? 1), 0);
-  const priceCap = Math.max(45000, subtotal * 0.4);
+
+  // ---------- meal completion: once the cart holds a MAIN (any combo/bucket or
+  // a protein), the job flips from "sell a meal" to "complete the meal" —
+  // complements only (dessert closes it), never another bundle. Without this,
+  // a 500k bucket cart gets pitched yet another bucket, and the old
+  // subtotal-scaled cap made it worse: the bigger the order, the bigger the
+  // bundles it allowed.
+  const mainCovered = cartItems.some((i) => i.is_combo)
+    || anchorCats.has("chicken") || anchorCats.has("burger-rice")
+    || coveredCats.has("chicken") || coveredCats.has("burger-rice");
+  const priceCap = mainCovered ? 60000 : Math.max(45000, subtotal * 0.4);
 
   // ---------- kindness first: does an existing combo cover what they already
   // picked, for less money (or more food at ~the same price)? Offer the SWAP
@@ -200,6 +210,7 @@ export async function recommend(
     if (m.stock != null && m.stock <= 5) return false;   // protect near-stockout items
     if (m.price > priceCap) return false;
     if (coveredCats.has(m.category)) return false;       // combo already contains this kind of item
+    if (mainCovered && m.is_combo) return false;         // never a second bundle on top of a main
     if (lastAnchorCat && m.category === lastAnchorCat && m.category !== "combo") return false;
     return true;
   });
@@ -281,7 +292,11 @@ export async function recommend(
     return top ? (STRATEGY_BY_SIGNAL[top[0]] ?? "popular") : "popular";
   };
 
-  tel.emit("rec_scored", "rec", "worker", `scored ${candidates.length} candidates → top ${slate.length} [${store.cluster}/${daypart}${festive ? "/festive" : ""}]`, {
+  if (!slate.length && cartItems.length) {
+    // nothing sensible left to add — say so instead of squeezing
+    tel.emit("strategy", "rec", "worker", "meal looks complete — no upsell pushed (kindness: trust > squeeze)");
+  }
+  tel.emit("rec_scored", "rec", "worker", `scored ${candidates.length} candidates → top ${slate.length} [${store.cluster}/${daypart}${festive ? "/festive" : ""}${mainCovered ? "/complete-the-meal" : ""}]`, {
     store: store.name, cluster: store.cluster,
     top: slate.map((s) => ({ id: s.m.id, name: s.m.name, score: +s.score.toFixed(3), breakdown: Object.fromEntries(Object.entries(s.breakdown).map(([k, v]) => [k, +v.toFixed(3)])) })),
     signals: enabled,
@@ -320,7 +335,7 @@ export async function recommend(
     tel.emit("llm_call", "rec", "llm", "pitch generation (gpt-oss-120b)", { items: recs.map((r) => r.name) });
     try {
       const pitched = await Promise.race([
-        llmPitch(env, cartItems, recs, daypart, store, festive, profile?.persona ?? null, comboInsides),
+        llmPitch(env, cartItems, recs, daypart, store, festive, profile?.persona ?? null, comboInsides, mainCovered),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
       ]);
       if (pitched) {
@@ -389,9 +404,10 @@ async function llmPitch(
   festive: boolean,
   persona: string | null,
   comboInsides: string[],
+  mainCovered = false,
 ): Promise<{ id: number; pitch_vn: string; pitch_en: string }[] | null> {
   const prompt = `You write kiosk upsell one-liners for ${store.name} (a ${store.cluster}-area KFC in Vietnam). Daypart: ${daypart}${festive ? " (weekend/holiday — family mood)" : ""}.
-Cart: ${cartItems.map((i) => i.name).join(", ")}.${comboInsides.length ? ` NOTE — ${comboInsides.join("; ")}. Pitches must COMPLEMENT what the cart already contains, never duplicate it.` : ""}
+Cart: ${cartItems.map((i) => i.name).join(", ")}.${comboInsides.length ? ` NOTE — ${comboInsides.join("; ")}. Pitches must COMPLEMENT what the cart already contains, never duplicate it.` : ""}${mainCovered ? " The meal's main course is already in the cart — pitch small finishing touches that COMPLETE it (a dessert closes the meal), never another meal or bundle." : ""}
 ${persona ? `Customer hypothesis (a guess — use the vibe, never state it literally): ${persona}. Tailor the tone (e.g. family → kids/sharing angle, office worker → quick/refreshing angle).` : ""}
 Candidates (with data-driven reasons): ${JSON.stringify(recs.map((r) => ({ id: r.id, name: r.name, price: r.price_display, attach_pct: r.co_pct, promo: r.promo_code })))}.
 For EACH candidate return one short, appetizing pitch line (max 14 words) in Vietnamese and English. Mention the attach_pct stat or promo when present. Use SENSORY words that make the reader taste it (giòn rụm, nóng hổi, mát lạnh / crispy, piping hot, ice-cold) — never bland copy. Return ONLY JSON:
