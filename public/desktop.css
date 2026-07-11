@@ -63,8 +63,9 @@
   overflow: hidden;
 }
 #diagram { flex: 1; width: 100%; height: 100%; }
+.dt-bottom-row { flex: 1; min-height: 0; display: flex; gap: 1vw; }
 .dt-log-panel {
-  flex: 1; min-height: 0;
+  flex: 1.7; min-width: 0; min-height: 0;
   background: var(--ops-panel);
   border: 1px solid var(--ops-line);
   border-radius: .8vw;
@@ -118,6 +119,32 @@
 .dg-edge-label { fill: #565D6E; font-family: var(--mono); font-size: 11px; }
 
 /* ---------- log ---------- */
+/* infra-cost meter — the ROI slide of the pitch */
+.dt-cost-panel {
+  flex: 1; min-width: 0; min-height: 0;
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-line);
+  border-radius: .8vw;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.cost-body { flex: 1; padding: .6vw 1vw; display: flex; flex-direction: column; gap: .45vw; overflow: hidden; }
+.cost-hero { display: flex; align-items: baseline; gap: .7vw; }
+.cost-hero b { font-size: 1.7vw; color: #3FB68B; font-weight: 900; font-family: var(--mono); }
+.cost-hero span { font-size: .72vw; color: var(--ops-dim); }
+.cost-rows { display: flex; flex-direction: column; gap: .3vw; }
+.cost-row { display: flex; align-items: center; gap: .6vw; font-size: .68vw; color: var(--ops-dim); }
+.cost-row span:first-child { flex: 0 0 7.5vw; }
+.cost-row .cost-meter { flex: 1; height: 5px; background: var(--ops-line); border-radius: 3px; overflow: hidden; }
+.cost-row .cost-meter i { display: block; height: 100%; background: #3FB68B; border-radius: 3px; transition: width .4s ease; }
+.cost-row em { font-style: normal; font-family: var(--mono); flex: 0 0 4.5em; text-align: right; color: var(--ops-text); }
+.cost-roi {
+  margin-top: auto;
+  border-top: 1px solid var(--ops-line); padding-top: .45vw;
+  font-size: .78vw; font-weight: 800; color: var(--ai-gold); line-height: 1.35;
+}
+.cost-note { font-size: .58vw; color: #565D6E; line-height: 1.3; }
+
 .log-scroll { flex: 1; overflow-y: auto; padding: .5vw .9vw; font-family: var(--mono); font-size: .72vw; }
 .log-scroll::-webkit-scrollbar { width: 6px; }
 .log-scroll::-webkit-scrollbar-thumb { background: var(--ops-line); border-radius: 3px; }

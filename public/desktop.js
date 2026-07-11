@@ -119,7 +119,68 @@
     if (e.node_from && e.node_to) pulse(e.node_from, e.node_to, colorFor(e));
     else if (e.node_from) glow(e.node_from);
     if (e.type === "profile_updated") { renderProfile(e); queueOpsRecs(); }
+    costTrack(e);
     addLog(e.source, e.label ?? e.type, e.duration_ms, e.created_at);
+  }
+
+  // ---------- infra cost meter — the ROI slide of the pitch ----------
+  // Cloudflare LIST prices (USD):
+  //   developers.cloudflare.com/workers-ai/platform/pricing  (per-token, per model)
+  //   developers.cloudflare.com/workers/platform/pricing     (requests / CPU / D1)
+  const USD = {
+    req: 0.30 / 1e6, cpuMs: 0.02 / 1e6, d1Read: 0.001 / 1e6, d1Write: 1.00 / 1e6,
+    model: {
+      gptoss: { inTok: 0.350 / 1e6, outTok: 0.750 / 1e6 },  // @cf/openai/gpt-oss-120b
+      fast8b: { inTok: 0.045 / 1e6, outTok: 0.384 / 1e6 },  // @cf/meta/llama-3.1-8b-fp8-fast
+      vision: { inTok: 0.049 / 1e6, outTok: 0.676 / 1e6 },  // @cf/meta/llama-3.2-11b-vision
+    },
+  };
+  // average tokens per call type (sized from our actual prompts, rounded up)
+  const TOK = {
+    pitch: ["gptoss", 520, 150], agent: ["gptoss", 1300, 220],
+    refine: ["fast8b", 620, 150], vision: ["vision", 900, 260],
+  };
+  const VND_RATE = 25500;
+  const cost = { ai: 0, d1: 0, worker: 0, events: 0 };
+  let aovUpliftVnd = 0; // stashed by refreshStats
+  function costTrack(e) {
+    cost.events++;
+    cost.d1 += USD.d1Write; // every telemetry row is one D1 write
+    if (e.type === "llm_call") {
+      const l = (e.label ?? "").toLowerCase();
+      const [m, ti, to] = l.includes("vision") || l.includes("llava") ? TOK.vision
+        : l.includes("8b") || l.includes("refine") ? TOK.refine
+        : l.includes("pitch") ? TOK.pitch : TOK.agent;
+      cost.ai += USD.model[m].inTok * ti + USD.model[m].outTok * to;
+    } else if (e.type === "d1_query") {
+      cost.d1 += USD.d1Read * 180;   // ≈ rows touched by one batched query
+    } else if (e.type === "api_call") {
+      cost.worker += USD.req + USD.cpuMs * 6;
+    }
+    renderCost();
+  }
+  function costReset() { cost.ai = 0; cost.d1 = 0; cost.worker = 0; cost.events = 0; renderCost(); }
+  function renderCost() {
+    const total = cost.ai + cost.d1 + cost.worker;
+    const box = $("#cost-body");
+    if (!box) return;
+    if (!total) { box.innerHTML = `<p class="profile-empty">Chưa có phiên.</p>`; return; }
+    const vnd = total * VND_RATE;
+    const row = (label, v) => `
+      <div class="cost-row"><span>${label}</span>
+        <div class="cost-meter"><i style="width:${Math.max(3, Math.round((v / total) * 100))}%"></i></div>
+        <em>$${v.toFixed(5)}</em></div>`;
+    const roi = aovUpliftVnd > 0 && vnd > 0 ? Math.round(aovUpliftVnd / vnd) : null;
+    box.innerHTML = `
+      <div class="cost-hero"><b>≈ ${vnd < 100 ? vnd.toFixed(1) : Math.round(vnd).toLocaleString("vi-VN")}₫</b>
+        <span>$${total.toFixed(4)} · phiên hiện tại · ${cost.events} events</span></div>
+      <div class="cost-rows">
+        ${row("Workers AI (LLM)", cost.ai)}
+        ${row("D1 (đọc + ghi)", cost.d1)}
+        ${row("Worker requests", cost.worker)}
+      </div>
+      ${roi ? `<div class="cost-roi">↗ AI nâng AOV +${Math.round(aovUpliftVnd / 1000)}k₫/đơn — gấp ~${roi.toLocaleString("vi-VN")}× chi phí cả phiên</div>` : ""}
+      <div class="cost-note">Giá niêm yết Cloudflare: gpt-oss $0.35/$0.75 · 8B-fast $0.045/$0.384 · vision $0.049/$0.676 mỗi 1M token · D1 $0.001/M rows đọc, $1/M ghi · $0.30/M requests. Token &amp; rows = ước tính trung bình mỗi lượt gọi.</div>`;
   }
 
   // ---------- live customer hypothesis panel ----------
@@ -242,6 +303,12 @@
     if (m.type === "handoff") pulse("agent", "staff", "green");
     // cart or session changed → re-probe what the AI would suggest now
     if (["add_to_cart", "rec_accepted", "session_start", "payment"].includes(m.type)) queueOpsRecs();
+    if (m.type === "session_start") {
+      // fresh customer: zero the meter, blank the hypothesis
+      costReset();
+      $("#profile-body").innerHTML = `<p class="profile-empty">Khách mới — đang quan sát thao tác…</p>`;
+      $("#pf-recs").hidden = true;
+    }
     addLog("ui", m.label ?? m.type, null);
   });
 
@@ -251,6 +318,7 @@
       const m = await api("/api/admin/metrics");
       const uplift = m.aov_without_rec_vnd > 0 && m.aov_with_rec_vnd > 0
         ? Math.round(((m.aov_with_rec_vnd - m.aov_without_rec_vnd) / m.aov_without_rec_vnd) * 100) : null;
+      aovUpliftVnd = Math.max(0, (m.aov_with_rec_vnd ?? 0) - (m.aov_without_rec_vnd ?? 0));
       $("#dt-stats").innerHTML = `
         <div class="stat"><b>${m.orders}</b><span>orders</span></div>
         <div class="stat"><b>${(m.revenue_vnd / 1000).toFixed(0)}k₫</b><span>revenue</span></div>

@@ -75,8 +75,8 @@ body.xmas .attract-hero { background-image: url("/img/hero-xmas.jpg"); }
   gap: 2.6cqw; padding: 7cqw 6cqw 9cqw;
 }
 .attract-logo {
-  width: 15cqw; border-radius: 2.4cqw;
-  box-shadow: 0 1.2cqw 4cqw rgba(0,0,0,.45);
+  width: 30cqw;   /* white brand lockup on transparency — no box needed */
+  filter: drop-shadow(0 .6cqw 2.4cqw rgba(0,0,0,.5));
 }
 .attract-title {
   font-size: 10.5cqw;
