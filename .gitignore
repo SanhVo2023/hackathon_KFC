@@ -3,3 +3,4 @@ node_modules/
 .playwright-mcp/
 .dev.vars
 *.log
+video/rec/
