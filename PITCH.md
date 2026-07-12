@@ -125,9 +125,13 @@ ticker, Christmas combos appear, the rec window re-computes with 🏷️ promo c
 
 ## Assets
 - Live: https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev (`/` · `/kiosk` · `/admin`)
-- **Demo video (Remotion):** `video/out/kfc-demo-60s.mp4` — the 60s judging cut for pitch slide 6
-  (Goal → Trigger → Agent Acts → Outcome → Proof, per the organizer keynote); `video/out/kfc-demo.mp4` — 82s full cut for the portal.
-  Rebuild: `cd video && npx remotion render src/index.ts kfc-demo-60 out/kfc-demo-60s.mp4`. Preview/edit: `npx remotion studio src/index.ts`.
+- **Demo video (Remotion): `video/out/kfc-demo-real.mp4` is THE demo** — ~76s of real screen
+  recordings of the production app (full kiosk journey + ops view with the profiler filling and the
+  Christmas one-tap), composed with decision captions and the ROI close. Use it as the live-demo
+  backup AND the portal video. Older static cuts (`kfc-demo.mp4`, `kfc-demo-60s.mp4`) remain but are superseded.
+  Re-record footage: the Playwright scripts live in the session history; marks are documented in `video/src/RealDemo.tsx`.
+  Rebuild: `cd video && npx remotion render src/index.ts kfc-demo-real out/kfc-demo-real.mp4`. Preview: `npx remotion studio src/index.ts`.
+  Sample camera frame for live demos: https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev/img/customer-demo.jpg (synthetic, Gemini-generated).
 - **Slide deck:** `slide-deck.html` + `slide-deck.pdf` — 6 slides on the organizer's 5-minute frame
   (Team+Promise · Problem Insight · Agentic Workflow · Evidence+Impact · Why It Wins · Demo+Close).
   ⚠️ Slide 1 says "MatViet Design Team" — edit if that's not the registered team name.

@@ -203,9 +203,13 @@ let filled = 0;
 for (const item of catalog) {
   if (item.image_url) continue;
   const key = fold(item.name).replace(/\s*\((vua|lon|l|r)\)\s*/g, " ").trim();
+  // token-subset match needs ≥2 significant tokens — an empty token list made
+  // .every() vacuously true and glued the FIRST crawled image (an egg tart)
+  // onto short-word names like "Cà Phê Sữa Đá"
+  const toks = key.split(" ").filter((w) => w.length > 3);
   const hit = imageMap.find((m) => m.key.includes(key) || key.includes(m.key) ||
-    key.split(" ").filter((w) => w.length > 3).every((w) => m.key.includes(w)));
-  if (hit) { item.image_url = hit.url; filled++; }
+    (toks.length >= 2 && toks.every((w) => m.key.includes(w))));
+  if (hit) { item.image_url = hit.url; filled++; console.log(`  img match: ${item.name} ← ${hit.key}`); }
 }
 // Gemini-generated product shots (seed/gen-images.mjs) fill the last gaps.
 // Keyed by NAME SLUG, not catalog id — ids shift whenever the crawl grows.

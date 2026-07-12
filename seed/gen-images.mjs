@@ -21,6 +21,11 @@ const HERO_STYLE = (p) =>
   `Dramatic appetizing hero photograph for a fried-chicken restaurant kiosk idle screen: ${p}. Cinematic warm lighting, shallow depth of field, photorealistic, rich deep-red backdrop, no text, no watermark, no logo, no people, PORTRAIT (vertical 3:4) composition.`;
 
 const TASKS = [
+  // items that previously stole the egg-tart image via the vacuous-match bug
+  { file: "gen-ca-phe-sua-da.jpg", prompt: MENU_STYLE("Vietnamese iced milk coffee (cà phê sữa đá) in a clear plastic cup with ice cubes, dark coffee swirling into condensed milk") },
+  { file: "gen-kem-oc-que.jpg", prompt: MENU_STYLE("a single vanilla soft-serve ice cream cone with a perfect swirl, crisp waffle cone") },
+  { file: "gen-com-ga-xoi-mo.jpg", prompt: MENU_STYLE("Vietnamese crispy chicken rice plate: golden fried chicken thigh over steamed rice with cucumber slices and a small soup cup") },
+  { file: "gen-combo-an-xe-45k.jpg", prompt: MENU_STYLE("afternoon snack combo: a small cup of crispy popcorn chicken bites and a cola paper cup with ice") },
   // product shots that survive reseeds (existing gen-*.jpg are skipped)
   { file: "gen-combo-ga-quay-giang-sinh.jpg", prompt: MENU_STYLE("Christmas special combo: a whole golden honey-pepper glazed roast chicken with two boxes of french fries and two cola paper cups, garnished with small pine sprigs and a thin red ribbon for a subtle festive touch") },
   { file: "gen-party-bucket-noel.jpg", prompt: MENU_STYLE("Christmas party feast: a plain red-and-white striped bucket with 10 crispy fried chicken pieces, two large boxes of french fries, a coleslaw cup, four cola paper cups and two strawberry sundae cups, subtle festive pine-and-ribbon styling") },
