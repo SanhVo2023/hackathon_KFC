@@ -70,6 +70,23 @@ recommendation carries a **strategy label** on the ops view so you can see the p
 - **Loss aversion** ("TIẾT KIỆM 8.000₫" flags + the kindness-first swap above) — framing
   the combo as avoiding a loss, not gaining an upsell.
 
+### 0d. The engine lives in EVERY step — not one box
+The rec engine surfaces across the whole journey, always inside native UI patterns:
+- **Attract:** the ticker features the engine-picked hot dish of this hour at this store
+  (holiday specials first in festive mode).
+- **Menu grid:** every category quietly **re-ranks per customer × store × hour** — invisible
+  personalization; the top pick per category gets an *honest* badge ("Bán chạy", "Đang ưu đãi",
+  "Dành cho bạn" — never margin- or inventory-motivated copy).
+- **MEAL SIZE:** honest upgrade stat from this cluster's POS ("58% khách ở đây chọn phần combo").
+- **ADD ON:** the engine-populated grid (cross-subsidy, persona, sensory pitches).
+- **Basket:** kindness swap + suggestion strip.
+- **Checkout:** ONE small last-chance chip (≤20k, one tap, never blocking).
+- **Confirmation:** a **comeback voucher targeted at a quiet daypart** — the agent grows
+  tomorrow's traffic, not just today's basket.
+- **No-nag guardrail:** an item offered twice without a yes is *rested* for the session —
+  a good salesperson doesn't repeat themselves a third time. Every surface has its own
+  trigger tag, so acceptance is measured per surface.
+
 ### 1. Recommendation engine (P2) — deterministic scoring × LLM voice
 **Context = customer hypothesis × store cluster × location × time × day/holiday × inventory × promos × cart.**
 Every rec moment (item added, cart review, agent tool call) runs an **8-signal scorer** over

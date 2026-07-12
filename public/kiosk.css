@@ -184,11 +184,18 @@ body.xmas .attract-title::after { content: " 🎄"; font-size: 6cqw; }
 /* ---------- menu grid (3-col, like the real kiosk) ---------- */
 .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2cqw; padding-bottom: 6cqw; }
 .menu-card {
+  position: relative;
   background: #fff; border: 1px solid #ececec; border-radius: .8cqw;
   padding: 1.2cqw; text-align: center;
   display: flex; flex-direction: column; gap: .8cqw;
   box-shadow: 0 .4cqw 1.4cqw rgba(0,0,0,.04);
   animation: cardIn .3s ease backwards;
+}
+.mc-badge {
+  position: absolute; top: .8cqw; left: .8cqw; z-index: 2;
+  background: #FFF4D6; color: #8A6400; border: 1px solid #F2A900;
+  border-radius: 99px; padding: .25cqw 1cqw;
+  font-size: 1.35cqw; font-weight: 800;
 }
 @keyframes cardIn { from { opacity: 0; transform: translateY(1.8cqw); } to { opacity: 1; transform: none; } }
 .mc-img, .mc-img-ph {
@@ -249,6 +256,7 @@ body.xmas .attract-title::after { content: " 🎄"; font-size: 6cqw; }
   display: flex; flex-direction: column; gap: 1.2cqw; align-items: center;
 }
 .size-card.sel { border-color: var(--kfc-red); box-shadow: 0 0 0 .3cqw rgba(228,0,43,.12); }
+.sc-stat { font-size: 1.5cqw; font-weight: 700; color: #1e9e5a; }
 .size-card img, .size-card .mc-img-ph { width: 80%; aspect-ratio: 1; object-fit: contain; }
 .sc-check {
   position: absolute; top: 1.6cqw; left: 1.6cqw;
@@ -400,6 +408,15 @@ body.xmas .attract-title::after { content: " 🎄"; font-size: 6cqw; }
 #screen-payment { padding: 13cqw 5cqw 4cqw; }
 .payment-inner { display: flex; flex-direction: column; gap: 2.6cqw; min-height: 100%; }
 .pay-total { font-size: 4.2cqw; font-weight: 900; }
+/* one-tap last-chance chip — never blocks, never begs */
+.pay-chip {
+  display: inline-flex; align-items: center; gap: 1cqw;
+  background: #FFF9EC; border: 1px dashed #F2A900; border-radius: 99px;
+  padding: 1.2cqw 2.6cqw; font-size: 2cqw; font-weight: 800; color: #333;
+  animation: cardIn .3s ease;
+}
+.pay-chip:active { background: #FFEFC9; }
+.pay-chip-done { font-size: 2cqw; font-weight: 800; color: var(--ok, #1e9e5a); animation: cardIn .3s ease; }
 .pay-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 2cqw; }
 .pay-card {
   background: #fff; border: 1px solid #e5e5e5; border-radius: 1cqw;
@@ -432,6 +449,16 @@ body.xmas .attract-title::after { content: " 🎄"; font-size: 6cqw; }
 .ost-step.on { background: var(--kfc-red); color: #fff; }
 .ost-sep { color: #ddd; }
 .confirm-summary { font-size: 2cqw; color: #777; }
+/* comeback voucher — the agent pulls the NEXT visit into a quiet daypart */
+.comeback {
+  display: flex; flex-direction: column; gap: .6cqw; align-items: center;
+  border: 2px dashed #F2A900; border-radius: 1cqw; background: #FFF9EC;
+  padding: 1.8cqw 3cqw; max-width: 62cqw;
+  animation: cardIn .4s ease backwards; animation-delay: .5s;
+}
+.cb-title { font-size: 2cqw; font-weight: 800; }
+.cb-desc { font-size: 1.7cqw; color: #666; }
+.cb-code { font-size: 2.6cqw; font-weight: 900; letter-spacing: .3em; color: var(--kfc-red); }
 
 /* confetti */
 .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }

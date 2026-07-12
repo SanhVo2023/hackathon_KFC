@@ -48,7 +48,9 @@ Two prepared photos in a folder on the desktop: ① mother with child ② man in
 
 ## 1:00 — SCENE 2 · One order, four psychology plays (50s)
 
-**DO:** rail **GÀ RÁN - GÀ QUAY** → open **"1 Miếng Gà Rán"**.
+**DO:** rail **GÀ RÁN - GÀ QUAY** — point at the grid first: *"notice the badges and the
+order — every category just re-ranked itself for THIS customer, this store, this hour.
+The menu is the recommendation."* → open **"1 Miếng Gà Rán"**.
 1. **MEAL SIZE** appears — point at the green **TIẾT KIỆM** flag on the combo card:
    > "Loss aversion — but pointed at the customer's wallet. Honest math, computed live."
    Choose **MÓN LẺ** (item only) — *"watch what it does about that in a moment."* → TIẾP TỤC.
@@ -75,6 +77,11 @@ The basket now holds chicken + drink + side as separate items → the **swap ban
 > "It just took money **off** the bill. Deliberate. Trust before upsell — that's a
 > salesperson customers come back to. And now that a full meal is in the basket, look at
 > the suggestion window: no more bundles. It **completes** meals — it never stacks them."
+
+Then tap **THANH TOÁN** → point at the single AI chip (*"one last small thing, one tap,
+never a wall"*) → pay → on the confirmation, point at the **comeback voucher**:
+> "And it doesn't stop at this basket — it hands them a voucher aimed at a QUIET daypart.
+> The agent grows tomorrow's traffic too."
 
 ## 2:15 — SCENE 4 · Đêm Giáng Sinh, one tap (25s)
 

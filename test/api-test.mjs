@@ -370,6 +370,30 @@ let recItemIds = [];
   check("NOEL promo deactivated on clear", !(promos2.body.promotions ?? []).some((p) => p.code === "NOEL"));
 }
 
+// 15f. engine-everywhere surfaces: menu ranking + no-nag
+{
+  const r = await api("/api/menu");
+  const items = r.body.items ?? [];
+  check("menu items carry rank_score", items.every((i) => typeof i.rank_score === "number"));
+  check("each category has exactly one honest badge", (() => {
+    const byCat = {};
+    for (const i of items) if (i.badge) byCat[i.category] = (byCat[i.category] ?? 0) + 1;
+    return Object.values(byCat).every((n) => n === 1) && Object.keys(byCat).length >= 4;
+  })(), JSON.stringify(items.filter((i) => i.badge).map((i) => `${i.name}:${i.badge}`)));
+  check("badges never expose margin/inventory motives", items.every((i) => !i.badge || ["Bán chạy", "Đang ưu đãi", "Dành cho bạn", "Hợp dịp này"].includes(i.badge) || i.badge.startsWith("Hợp ")));
+
+  // no-nag: two unanswered offers → the third slate rests those items
+  const nagSession = "nonag-" + Math.random().toString(36).slice(2, 8);
+  const cart = [{ item_id: chicken.id, qty: 1 }];
+  const s1 = await api("/api/recommend", { method: "POST", body: JSON.stringify({ session_id: nagSession, cart, trigger: "cart_review" }) });
+  await api("/api/recommend", { method: "POST", body: JSON.stringify({ session_id: nagSession, cart, trigger: "cart_review" }) });
+  const s3 = await api("/api/recommend", { method: "POST", body: JSON.stringify({ session_id: nagSession, cart, trigger: "cart_review" }) });
+  const first = new Set((s1.body.items ?? []).map((i) => i.id));
+  const third = (s3.body.items ?? []).map((i) => i.id);
+  check("no-nag: items offered twice without a yes are rested", third.every((id) => !first.has(id)),
+    `1st=${[...first].join(",")} 3rd=${third.join(",")}`);
+}
+
 // 16. chat poll (HITL relay endpoint)
 {
   const r = await api(`/api/chat/poll?session_id=${SESSION}&after=0`);

@@ -5,7 +5,7 @@
 // /api/*       -> kiosk + agent + admin APIs (D1-grounded)
 
 import { runAgent } from "./agent";
-import { recommend, getStore, type CartLine } from "./recs";
+import { recommend, rankCatalog, getStore, type CartLine } from "./recs";
 import { placeOrder } from "./tools";
 import { profileFromPhoto, refineProfile, getProfile } from "./profiler";
 import { Telemetry, handleTelemetryGet, vnNow, getContext } from "./telemetry";
@@ -78,6 +78,10 @@ async function handlePublic(
        ORDER BY m.category, m.price`,
     ).bind(storeId).all();
     tel.emit("d1_query", "worker", "d1", `menu @ ${store.name}: ${rs.results.length} items in stock${ctx.scenario ? " [scenario]" : ""}`, undefined, Date.now() - t0);
+    // the grid itself is a recommendation: rank every item for this
+    // session × store × hour so the kiosk can quietly reorder each category
+    const sessionId = request.headers.get("x-session-id") ?? "anon";
+    await rankCatalog(env, tel, sessionId, rs.results as never, store, ctx.daypart, ctx.dow, ctx.festive);
     return json({
       items: rs.results, store, festive: ctx.festive, holiday: ctx.holiday,
       daypart: ctx.daypart, dow: ctx.dow, scenario: ctx.scenario?.label ?? null,

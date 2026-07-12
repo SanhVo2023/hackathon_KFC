@@ -133,6 +133,9 @@
     if (data.store) $("#kh-store").textContent = data.store.name;
     S.byCat = {};
     for (const m of S.menu) (S.byCat[m.category] ??= []).push(m);
+    // the grid itself is a recommendation: each category quietly reorders per
+    // customer × store × hour (engine rank), like a good store re-shelving
+    for (const c of Object.keys(S.byCat)) S.byCat[c].sort((a, b) => (b.rank_score ?? 0) - (a.rank_score ?? 0));
     S.cats = ["combo", "chicken", "burger-rice", "snack", "drink", "dessert"].filter((c) => S.byCat[c]?.length);
     if (!S.cats.includes(S.activeCat)) S.activeCat = S.cats[0];
     const promoData = await api("/api/promotions");
@@ -151,6 +154,10 @@
     if (!el) return;
     clearInterval(tickerTimer);
     const lines = S.promos.map((p) => `🔥 ${p.name} — ${p.description}`);
+    // engine-picked hot dish of THIS hour at THIS store (holiday specials first)
+    const hot = (S.holiday && S.menu.find((m) => /giang sinh|noel/.test(fold(m.name))))
+      || [...S.menu].sort((a, b) => (b.rank_score ?? 0) - (a.rank_score ?? 0))[0];
+    if (hot) lines.unshift(`⭐ ${itemName(hot)} — món hot ${DAYPART_META[S.daypart]?.vi?.toLowerCase() ?? "lúc này"} tại đây`);
     if (S.holiday) lines.unshift(`🎄 ${S.holiday}: ${S.lang === "vi" ? "combo Noel đang chờ bạn!" : "Christmas combos are here!"}`);
     if (!lines.length) { el.innerHTML = ""; return; }
     let i = 0;
@@ -190,6 +197,7 @@
     const items = S.byCat[S.activeCat] ?? [];
     $("#menu-grid").innerHTML = items.map((m, i) => `
       <button class="menu-card" data-id="${m.id}" style="animation-delay:${Math.min(i * 35, 280)}ms">
+        ${m.badge ? `<span class="mc-badge">${m.badge}</span>` : ""}
         ${imgTag(m, "mc-img", "mc-img-ph")}
         <span class="mc-name">${itemName(m)}</span>
         <span class="mc-price">${fmtVND(m.price)}</span>
@@ -335,6 +343,12 @@
             <span class="sc-label">${t("combo_meal")}</span>
             <span class="sc-desc">${co.combo.description ?? ""}</span>
             <span class="sc-price">${fmtVND(co.combo.price)}</span>
+            ${(() => {
+              // honest upgrade stat straight from this cluster's POS history
+              const c = co.combo.pop_cnt ?? 0, b = W.base.pop_cnt ?? 0;
+              const pct = c >= 20 && b >= 20 ? Math.round((c / (c + b)) * 100) : null;
+              return pct && pct >= 30 ? `<span class="sc-stat">${pct}% khách ở đây chọn phần combo</span>` : "";
+            })()}
           </button>
           <button class="size-card ${W.sizeChoice === "single" ? "sel" : ""}" data-size="single">
             <span class="sc-check"></span>
@@ -573,6 +587,25 @@
     renderCart();
   }
 
+  // last-chance chip at checkout: ONE small finishing touch (≤20k), engine-picked,
+  // one tap, never blocking — the classic register-side candy shelf, done honestly
+  async function renderLastChance() {
+    const box = $("#pay-lastchance");
+    box.innerHTML = "";
+    try {
+      const cart = S.cart.map((l) => ({ item_id: l.item.id, qty: l.qty }));
+      const data = await api("/api/recommend", { method: "POST", body: { session_id: KFC.sessionId, cart, trigger: "checkout" } });
+      if (S.screen !== "payment") return;
+      const pick = (data.items ?? []).find((r) => r.price <= 20000);
+      if (!pick) return;
+      box.innerHTML = `
+        <button class="pay-chip" data-id="${pick.id}">
+          <span class="ai-badge">✦ AI</span> ${S.lang === "vi" ? "Thêm" : "Add"} ${S.lang === "en" && pick.name_en ? pick.name_en : pick.name} · +${pick.price_display}
+        </button>`;
+      postEvent("rec_shown", `last-chance at checkout: ${pick.name} (${pick.strategy})`);
+    } catch (_) { /* checkout must never wait on this */ }
+  }
+
   // ---------- checkout ----------
   async function placeOrder(method) {
     $("#pay-methods").classList.add("hidden");
@@ -608,6 +641,20 @@
       `${o.items.map((i) => `${i.quantity}× ${i.name}`).join(" · ")} — ${o.total_display}` +
       (o.promo_code ? ` (${o.promo_code} −${o.discount_display})` : "");
     renderStatusTrack(o.status);
+    // comeback voucher: pull the NEXT visit into a quiet daypart — the agent
+    // grows tomorrow's traffic, not just today's basket
+    const next = S.promos.find((p) => !p.applies_now && p.daypart && p.daypart !== S.daypart && p.code !== o.promo_code);
+    const vBox = $("#comeback-voucher");
+    if (next && vBox) {
+      vBox.innerHTML = `
+        <div class="comeback">
+          <span class="cb-title">🎁 ${S.lang === "vi" ? "Hẹn gặp lại — dành riêng cho lần tới" : "See you next time"}</span>
+          <span class="cb-desc">${next.description}</span>
+          <span class="cb-code">${next.code}</span>
+        </div>`;
+      postEvent("rec_shown", `comeback voucher: ${next.code} (${next.daypart} — pulling the next visit into a quiet daypart)`);
+      observe(`received a comeback voucher for ${next.daypart}`);
+    } else if (vBox) vBox.innerHTML = "";
   }
 
   function renderStatusTrack(status) {
@@ -719,6 +766,19 @@
       $("#pay-methods").classList.remove("hidden");
       $("#pay-qr").classList.add("hidden");
       show("payment");
+      renderLastChance();
+    }
+    else if (btn.classList.contains("pay-chip")) {
+      const m = S.menu.find((x) => x.id === Number(btn.dataset.id));
+      if (m) {
+        S.cart.push({ item: m, qty: 1, mods: [], unit: m.price, fromRec: true });
+        api("/api/rec-feedback", { method: "POST", body: { session_id: KFC.sessionId, accepted_item_id: m.id } });
+        observe(`ACCEPTED the last-chance suggestion at checkout: ${m.name}`);
+        postEvent("rec_accepted", `last-chance accepted at checkout: ${m.name}`, { id: m.id });
+        $("#pay-total").textContent = fmtVND(cartSubtotal() - voucherDiscount(cartSubtotal()));
+        $("#pay-lastchance").innerHTML = `<div class="pay-chip-done">✓ ${t("added")}: ${itemName(m)}</div>`;
+        renderBottomBar();
+      }
     }
     else if (btn.classList.contains("pay-card")) placeOrder(btn.dataset.method);
     else if (btn.id === "btn-back-cart") show("cart");

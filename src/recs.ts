@@ -68,6 +68,69 @@ export async function getStore(env: Env, storeId: number): Promise<StoreInfo> {
 }
 export { todayHoliday };
 
+// ---------- catalog ranking: the menu grid itself is a recommendation ----------
+// Scores every in-stock item on the anchorless signals (daypart, promo,
+// inventory posture, persona, margin, popularity) so the kiosk can reorder
+// each category per customer × store × hour — invisible personalization inside
+// the native grid. Top pick per category gets an HONEST badge (never margin/
+// inventory-driven copy).
+const DAYPART_VN: Record<string, string> = { breakfast: "buổi sáng", lunch: "giờ trưa", tea: "giờ xế", dinner: "giờ tối", late: "đêm muộn" };
+
+export async function rankCatalog(
+  env: Env, tel: Telemetry, sessionId: string,
+  items: (MenuItem & { stock?: number; rank_score?: number; badge?: string | null; pop_cnt?: number })[],
+  store: StoreInfo, daypart: Daypart, dow: number, festive: boolean,
+): Promise<void> {
+  const t0 = Date.now();
+  const settings = await getSettings(env);
+  const signals = (settings.signals ?? {}) as Record<string, boolean>;
+  const baseWeights = (settings.weights ?? {}) as Record<string, number>;
+  const enabled = ["daypart", "promo", "inventory", "persona", "margin", "popularity"]
+    .filter((k) => signals[k] !== false && baseWeights[k]);
+  const wSum = enabled.reduce((s, k) => s + baseWeights[k], 0) || 1;
+  const w = Object.fromEntries(enabled.map((k) => [k, baseWeights[k] / wSum]));
+
+  const [profile, popRows, promoRows] = await Promise.all([
+    getProfile(env, sessionId),
+    env.DB.prepare("SELECT item_id, cnt, share FROM item_popularity WHERE cluster=? AND daypart=?").bind(store.cluster, daypart).all(),
+    env.DB.prepare("SELECT * FROM promotions WHERE active=1").all(),
+  ]);
+  const popMap = new Map((popRows.results as { item_id: number; cnt: number; share: number }[]).map((r) => [r.item_id, r]));
+  const maxShare = Math.max(0.001, ...[...popMap.values()].map((r) => r.share));
+  const activePromos = (promoRows.results as unknown as Promo[]).filter((p) => promoApplies(p, daypart, dow));
+
+  const perCatTop = new Map<string, { item: typeof items[number]; dominant: string; score: number }>();
+  for (const m of items) {
+    const tags: string[] = m.tags ? JSON.parse(m.tags) : [];
+    const parts: Record<string, number> = {};
+    if (w.daypart) parts.daypart = w.daypart * ((tags.includes(daypart) || (festive && tags.includes("sharing"))) ? 1 : 0);
+    if (w.promo) parts.promo = w.promo * (activePromos.some((p) => (p.item_id != null && p.item_id === m.id) || (p.scope_category != null && p.scope_category === m.category)) ? 1 : 0);
+    if (w.inventory) parts.inventory = w.inventory * (m.stock == null ? 0.5 : clamp01(m.stock / 60));
+    if (w.persona) parts.persona = w.persona * (profile?.category_bias?.[m.category] ?? 0) * (profile ? Math.max(0.4, profile.confidence) : 0);
+    if (w.margin) parts.margin = w.margin * (m.margin_pct / 100);
+    if (w.popularity) parts.popularity = w.popularity * ((popMap.get(m.id)?.share ?? m.popularity * maxShare * 0.5) / maxShare);
+    m.rank_score = +Object.values(parts).reduce((s, v) => s + v, 0).toFixed(4);
+    m.badge = null;
+    m.pop_cnt = popMap.get(m.id)?.cnt ?? 0;
+    // honest badge candidates only — margin/inventory never write customer copy
+    const honest = Object.entries(parts).filter(([k, v]) => v > 0 && ["persona", "daypart", "promo", "popularity"].includes(k));
+    if (honest.length) {
+      const [dom] = honest.sort((a, b) => b[1] - a[1])[0];
+      const top = perCatTop.get(m.category);
+      if (!top || m.rank_score! > top.score) perCatTop.set(m.category, { item: m, dominant: dom, score: m.rank_score! });
+    }
+  }
+  for (const { item, dominant } of perCatTop.values()) {
+    item.badge = dominant === "persona" ? "Dành cho bạn"
+      : dominant === "promo" ? "Đang ưu đãi"
+      : dominant === "daypart" ? (festive ? "Hợp dịp này" : `Hợp ${DAYPART_VN[daypart] ?? daypart}`)
+      : "Bán chạy";
+  }
+  tel.emit("rec_scored", "rec", "kiosk",
+    `menu personalized: ${items.length} items re-ranked (${store.cluster}/${daypart}${profile ? ` × "${(profile.persona ?? "").slice(0, 40)}…"` : ", cold start"})`,
+    undefined, Date.now() - t0);
+}
+
 export async function recommend(
   env: Env,
   tel: Telemetry,
@@ -98,7 +161,7 @@ export async function recommend(
   const t0 = Date.now();
   const marks = cartIds.map(() => "?").join(",") || "0";
 
-  const [cartRows, pairRows, affRows, candRows, promoRows, popRows] = await env.DB.batch([
+  const [cartRows, pairRows, affRows, candRows, promoRows, popRows, shownRows] = await env.DB.batch([
     env.DB.prepare(`SELECT * FROM menu_items WHERE id IN (${marks})`).bind(...cartIds),
     env.DB.prepare(
       `SELECT item_a, item_b, cnt FROM item_pairs_c WHERE cluster=? AND item_a IN (${marks}) AND daypart=?`,
@@ -111,7 +174,18 @@ export async function recommend(
     ).bind(storeId),
     env.DB.prepare("SELECT * FROM promotions WHERE active = 1"),
     env.DB.prepare("SELECT item_id, cnt, share FROM item_popularity WHERE cluster=? AND daypart=?").bind(store.cluster, daypart),
+    env.DB.prepare("SELECT shown_items, accepted_item_id FROM rec_events WHERE session_id=? ORDER BY id DESC LIMIT 20").bind(sessionId),
   ]);
+
+  // no-nag: an item offered twice this session without a yes gets a rest —
+  // a good salesperson doesn't repeat themselves a third time
+  const showCount = new Map<number, number>();
+  const acceptedIds = new Set<number>();
+  for (const r of shownRows.results as { shown_items: string; accepted_item_id: number | null }[]) {
+    if (r.accepted_item_id) acceptedIds.add(r.accepted_item_id);
+    try { for (const id of JSON.parse(r.shown_items) as number[]) showCount.set(id, (showCount.get(id) ?? 0) + 1); } catch { /* legacy */ }
+  }
+  const overShown = new Set([...showCount.entries()].filter(([id, n]) => n >= 2 && !acceptedIds.has(id)).map(([id]) => id));
   tel.emit("d1_query", "rec", "d1", `POS pairs + inventory + popularity (${store.name} · ${store.cluster} · ${daypart}${festive ? " · " + (holiday ?? "weekend") : ""})`, { store: storeId, cluster: store.cluster, daypart }, Date.now() - t0);
 
   const cartItems = cartRows.results as unknown as MenuItem[];
@@ -204,7 +278,7 @@ export async function recommend(
   }
 
   const inCart = new Set(cartIds);
-  const candidates = (candRows.results as unknown as Candidate[]).filter((m) => {
+  let candidates = (candRows.results as unknown as Candidate[]).filter((m) => {
     if (inCart.has(m.id)) return false;
     if (!m.inv_available) return false;
     if (m.stock != null && m.stock <= 5) return false;   // protect near-stockout items
@@ -214,6 +288,13 @@ export async function recommend(
     if (lastAnchorCat && m.category === lastAnchorCat && m.category !== "combo") return false;
     return true;
   });
+  if (overShown.size) {
+    const rested = candidates.filter((m) => !overShown.has(m.id));
+    if (rested.length >= 6 && rested.length < candidates.length) {
+      tel.emit("strategy", "rec", "worker", `no-nag: ${candidates.length - rested.length} item(s) rested after 2 unanswered offers`);
+      candidates = rested;
+    }
+  }
 
   const scored = candidates.map((m) => {
     const tags: string[] = m.tags ? JSON.parse(m.tags) : [];
