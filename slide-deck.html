@@ -41,7 +41,15 @@
   .step h3 { font-size:23px; font-weight:900; color:var(--gold); margin-bottom:8px; }
   .step p { font-size:16.5px; line-height:1.45; }
   .step small { display:block; margin-top:8px; font-size:13.5px; color:var(--dim); font-family:Consolas,monospace; }
+  /* journey strip — the engine at every step */
+  .jstrip { display:grid; grid-template-columns:repeat(7, 1fr); gap:10px; }
+  .jstep { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--red); border-radius:12px; padding:12px 12px 10px; position:relative; }
+  .jstep::after { content:"→"; position:absolute; right:-13px; top:38%; color:var(--red); font-size:19px; font-weight:900; z-index:2; }
+  .jstep:last-child::after { content:""; }
+  .jstep h4 { font-size:18px; font-weight:900; color:#fff; margin-bottom:5px; text-transform:uppercase; letter-spacing:.04em; }
+  .jstep p { font-size:14.5px; line-height:1.35; color:var(--dim); }
   @media print {
+    .jstep h4{font-size:12px} .jstep p{font-size:9.5px}
     .slide { width:297mm; height:167mm; padding:30px 40px 30px 56px; }
     h1{font-size:50px} h2{font-size:34px} p,li{font-size:15px} .kicker{font-size:13px}
     .shot{max-height:95mm} .step p{font-size:11px} .step h3{font-size:15px} .step small{font-size:9px}
@@ -97,7 +105,7 @@
       <p>Chooses its own data &amp; tools: cluster POS pairs, store inventory, promo calendar, profile store, gpt-oss pitch writer; ordering agent wields <b>9 D1-grounded tools</b>.</p>
       <small>D1 batch ~70ms · Workers AI</small></div>
     <div class="step"><h3>⚡ Act</h3>
-      <p>Injects decisions into the <b>native journey</b>: savings flag, drink-led ADD ON, money-saving swap, festive re-skin. Places orders, applies vouchers, hands off to humans.</p>
+      <p>Acts on <b>every step</b> of the native journey: re-ranked menu grid, savings flag, drink-led ADD ON, money-saving swap, last-chance chip, comeback voucher, festive re-skin. Places orders, hands off to humans.</p>
       <small>preemptive: computed before the screen opens</small></div>
     <div class="step"><h3>✅ Verify</h3>
       <p>Logs impression → accept → order; computes an <b>honest AOV counterfactual</b>. LLM slow? Falls back to deterministic copy. Never suggests what a store can’t serve.</p>
@@ -105,7 +113,7 @@
   </div>
   <div class="card" style="border-color:var(--gold);">
     <p><b>Decisions the agent makes by itself:</b>
-    <span class="chip g">which psychology play per slot</span><span class="chip g">offer the cheaper swap first</span><span class="chip g">stop selling when the meal is complete</span><span class="chip g">push overstock / protect stockouts</span><span class="chip g">escalate to a human</span></p>
+    <span class="chip g">which psychology play per slot</span><span class="chip g">offer the cheaper swap first</span><span class="chip g">stop selling when the meal is complete</span><span class="chip g">rest an item after 2 unanswered offers</span><span class="chip g">push overstock / protect stockouts</span><span class="chip g">escalate to a human</span></p>
   </div>
   <div class="foot">Every decision streams to a live system diagram — the judges can watch it think</div>
 </section>
@@ -131,7 +139,7 @@
   <div class="cols">
     <div>
       <ul>
-        <li><b>70 automated end-to-end assertions</b> — green on the production URL right now (latency, psychology rules, per-store inventory, holiday scenario…).</li>
+        <li><b>74 automated end-to-end assertions</b> — green on the production URL right now (latency, psychology rules, honest badges, no-nag, per-store inventory, holiday scenario…).</li>
         <li>Rec moment ≤1.5s; scorer ~70ms; survives total LLM outage.</li>
         <li>Real catalog: <b>106 items crawled live</b> from kfcvietnam.com.vn by TinyFish agents.</li>
       </ul>
@@ -145,19 +153,27 @@
 <section class="slide">
   <div class="tag">5 · Why It Wins</div>
   <div class="kicker">The unfair advantage</div>
-  <h2>Same journey. Invisible brain. Trust as strategy.</h2>
+  <h2>Same journey — the brain at <u>every</u> step</h2>
+  <div class="jstrip">
+    <div class="jstep"><h4>Attract</h4><p>hot dish of this hour, this store</p></div>
+    <div class="jstep"><h4>Menu grid</h4><p>re-ranks per customer × hour + honest badges</p></div>
+    <div class="jstep"><h4>Meal size</h4><p>real upgrade stat from local POS</p></div>
+    <div class="jstep"><h4>Add on</h4><p>cross-subsidy, sensory pitches, zero wait</p></div>
+    <div class="jstep"><h4>Basket</h4><p>cheaper-combo swap FIRST</p></div>
+    <div class="jstep"><h4>Checkout</h4><p>one last-chance chip, one tap</p></div>
+    <div class="jstep"><h4>Confirm</h4><p>comeback voucher → quiet daypart</p></div>
+  </div>
   <div class="cols">
     <div>
       <ul>
-        <li><b>Zero re-education:</b> the AI lives <i>inside</i> the exact KFC journey customers already know — vs chatbot bolt-ons nobody uses at a kiosk.</li>
-        <li><b>Kindness-first economics:</b> it takes money OFF the bill (combo swap) before it upsells, and stops selling when the meal is complete. That’s why acceptance holds at 35%.</li>
-        <li><b>A brain per store:</b> cluster-mined baskets × live inventory × holiday calendar — staged in one tap (Đêm Giáng Sinh 🎄), operated by non-technical staff.</li>
-        <li><b>Glass box, near-zero cost:</b> every decision visible + itemized at 13₫/session — deployable to 250 stores inside the 90-day window on one Cloudflare Worker.</li>
+        <li><b>Zero re-education:</b> every one of those moments is a native UI pattern customers already know — vs chatbot bolt-ons nobody uses at a kiosk.</li>
+        <li><b>Kindness-first economics:</b> money OFF before upsell, stop selling when the meal is complete, <b>no-nag</b> (two unanswered offers → the item rests). That’s why acceptance holds at 35%.</li>
+        <li><b>A brain per store:</b> cluster baskets × live inventory × holidays — staged in one tap (Đêm Giáng Sinh 🎄), run by non-technical staff. Acceptance is measured <b>per surface</b>, so operators learn which moment converts.</li>
       </ul>
     </div>
-    <div><img class="shot" src="asset-xmas.png" style="max-height:56vh;" /></div>
+    <div style="flex:.55;"><img class="shot" src="asset-xmas.png" style="max-height:34vh;" /></div>
   </div>
-  <div class="foot">Traditional: static box, updated monthly · Us: a salesperson’s judgment, per customer, per second</div>
+  <div class="foot">Traditional: one static box, updated monthly · Us: a salesperson’s judgment at seven moments, per customer, per second</div>
 </section>
 
 <!-- SLIDE 6 · DEMO + CLOSE (4:00–5:00) -->
