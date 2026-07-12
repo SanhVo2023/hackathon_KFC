@@ -13,7 +13,7 @@ https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev
 https://github.com/SanhVo2023/hackathon_KFC
 
 ## Video demo link
-Upload `video/out/kfc-demo-real.mp4` to YouTube (unlisted) and paste the link here.
+https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev/demo.mp4 (direct, plays in any browser). Alternative: https://github.com/SanhVo2023/hackathon_KFC/raw/master/video/out/kfc-demo-real.mp4 — or upload to YouTube unlisted if the portal insists on a platform link.
 
 ## Image gallery (from repo root, in this order)
 1. `4k-v4-prod.png` — the 4K live system view
