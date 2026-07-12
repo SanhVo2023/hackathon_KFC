@@ -19,6 +19,8 @@ const MENU_STYLE = (p) =>
   `Professional studio product photography for a fast-food menu board: ${p}. Centered composition on a PURE WHITE background, appetizing, natural warm lighting, photorealistic, no text, no watermark, no logo, no people, square format.`;
 const HERO_STYLE = (p) =>
   `Dramatic appetizing hero photograph for a fried-chicken restaurant kiosk idle screen: ${p}. Cinematic warm lighting, shallow depth of field, photorealistic, rich deep-red backdrop, no text, no watermark, no logo, no people, PORTRAIT (vertical 3:4) composition.`;
+const POSTER_STYLE = (p) =>
+  `Mouth-watering fast-food promotion poster artwork: ${p}. Bold appetizing food-advertising style, dramatic studio lighting, photorealistic, rich saturated colors, dynamic composition with generous empty space at the top third for a headline, ABSOLUTELY NO text, no letters, no numbers, no watermark, no logo, no people, LANDSCAPE (4:3) composition.`;
 
 const TASKS = [
   // items that previously stole the egg-tart image via the vacuous-match bug
@@ -32,6 +34,12 @@ const TASKS = [
   // attract-screen heroes
   { file: "hero-attract.jpg", prompt: HERO_STYLE("a plain red-and-white striped bucket overflowing with crispy golden fried chicken pieces, gentle steam rising, a few golden crumbs mid-air") },
   { file: "hero-xmas.jpg", prompt: HERO_STYLE("a plain red-and-white striped bucket overflowing with crispy golden fried chicken, surrounded by pine branches and softly glowing warm fairy-light bokeh, a quiet Christmas evening mood") },
+  // promo-popup poster art (agent-picked spotlight) — NO TEXT: Vietnamese
+  // copy + prices are overlaid in HTML so they are always correct
+  { file: "promo-noel.jpg", prompt: POSTER_STYLE("a festive Christmas feast: golden roast chicken and a striped bucket of fried chicken on a deep red table, pine branches, warm fairy-light bokeh and soft snow dust") },
+  { file: "promo-cuoituan.jpg", prompt: POSTER_STYLE("a weekend family feast: a big striped bucket overflowing with crispy fried chicken, boxes of golden fries and cola cups flying dynamically around it, confetti of crumbs") },
+  { file: "promo-toiganket.jpg", prompt: POSTER_STYLE("a warm group dinner spread: fried chicken bucket, burgers, fries and shared cola cups arranged generously on a deep red backdrop, cozy evening glow") },
+  { file: "promo-truavui.jpg", prompt: POSTER_STYLE("a quick office lunch set: crispy chicken pieces, a rice plate and an iced cola with fresh steam, bright energetic daylight on a deep red backdrop") },
 ];
 
 const MODELS = [

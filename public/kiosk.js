@@ -138,6 +138,7 @@
     for (const c of Object.keys(S.byCat)) S.byCat[c].sort((a, b) => (b.rank_score ?? 0) - (a.rank_score ?? 0));
     S.cats = ["combo", "chicken", "burger-rice", "snack", "drink", "dessert"].filter((c) => S.byCat[c]?.length);
     if (!S.cats.includes(S.activeCat)) S.activeCat = S.cats[0];
+    S.promoSpotlight = data.promo_spotlight ?? null;
     const promoData = await api("/api/promotions");
     S.promos = promoData.promotions;
     renderContextStrip();
@@ -191,6 +192,59 @@
     if (!m.image_url) return `<div class="${phCls}"><span>${icon}</span><small>${itemName(m).split(" ").slice(0, 2).join(" ")}</small></div>`;
     return `<img class="${cls}" src="${m.image_url}" alt="" loading="lazy"
       onerror="this.outerHTML='<div class=&quot;${phCls}&quot;><span>${icon}</span></div>'" />`;
+  }
+
+  // ---------- promo popup — the deal the ALGORITHM picked for this session ----------
+  // Poster-style, e-commerce honest pricing: list price struck through, deal
+  // price below, one tap adds the dish AND applies the voucher. Once per session.
+  function showPromoPop() {
+    const sp = S.promoSpotlight;
+    if (!sp || S.popupShown || $("#promo-pop")) return;
+    const m = S.menu.find((x) => x.id === sp.item_id);
+    if (!m) return;
+    S.popupShown = true;
+    const off = sp.kind === "percent" ? `-${sp.value}%` : `−${fmtVND(sp.value)}`;
+    const poster = `/img/promo-${sp.code.toLowerCase()}.jpg`;
+    const el = document.createElement("div");
+    el.className = "promo-pop";
+    el.id = "promo-pop";
+    el.innerHTML = `
+      <div class="pp-card">
+        <button class="pp-close" aria-label="close">✕</button>
+        <div class="pp-art">
+          <img src="${poster}" alt="" onerror="this.src='${sp.image_url ?? ""}'" />
+          <span class="pp-flag">${S.lang === "vi" ? "ƯU ĐÃI HÔM NAY" : "TODAY'S DEAL"}</span>
+        </div>
+        <div class="pp-body">
+          <h3>${sp.name}</h3>
+          <div class="pp-item">${S.lang === "en" && sp.item_name_en ? sp.item_name_en : sp.item_name}</div>
+          <div class="pp-prices">
+            <s>${fmtVND(sp.original_price)}</s>
+            <b class="pp-deal">${fmtVND(sp.deal_price)}</b>
+            <span class="pp-off">${off}</span>
+          </div>
+          <button class="pp-cta">🛒 ${S.lang === "vi" ? "Thêm vào giỏ — dùng ưu đãi" : "Add to cart with this deal"}</button>
+          <button class="pp-later">${S.lang === "vi" ? "Để sau" : "Maybe later"}</button>
+          <small class="pp-note">✦ ${S.lang === "vi" ? "AI chọn ưu đãi hợp phiên này · giá gạch là giá niêm yết" : "Picked by AI for this session · struck price is the list price"}</small>
+        </div>
+      </div>`;
+    $("#kiosk").appendChild(el);
+    postEvent("rec_shown", `promo popup: ${sp.code} → ${sp.item_name} (${fmtVND(sp.original_price)} → ${fmtVND(sp.deal_price)})`);
+    const dismiss = (why) => {
+      el.remove();
+      if (why) { observe("dismissed the promo popup without adding"); postEvent("tap", "promo popup dismissed"); }
+    };
+    el.querySelector(".pp-close").addEventListener("click", () => dismiss(true));
+    el.querySelector(".pp-later").addEventListener("click", () => dismiss(true));
+    el.querySelector(".pp-cta").addEventListener("click", () => {
+      S.cart.push({ item: m, qty: 1, mods: [], unit: m.price, fromRec: true });
+      S.voucher = { code: sp.code, name: sp.name, kind: sp.kind, value: sp.value, min_order: sp.min_order };
+      observe(`accepted the promo popup: added ${sp.item_name} with voucher ${sp.code}`);
+      postEvent("rec_accepted", `promo popup accepted: ${sp.code} → ${sp.item_name} (saves ${fmtVND(sp.original_price - sp.deal_price)})`);
+      toast(`💚 ${S.lang === "vi" ? "Đã thêm + áp mã" : "Added + voucher applied"} ${sp.code} — ${S.lang === "vi" ? "tiết kiệm" : "save"} ${fmtVND(sp.original_price - sp.deal_price)}`);
+      renderBottomBar();
+      dismiss(false);
+    });
   }
 
   function renderGrid() {
@@ -429,10 +483,18 @@
     }
     const recs = (W.recs ?? []).slice(0, 3);
     postEvent("rec_shown", `add-on step: ${recs.map((r) => r.name).join(", ")}`);
+    // honest trust tag per strategy — "is it good?" answered at a glance
+    const AO_TAG = {
+      popular: ["Bán chạy", "Best seller"], cooccurrence: ["Hay mua cùng", "Often paired"],
+      cross_subsidy: ["Hay mua cùng", "Often paired"], promo: ["Đang ưu đãi", "On deal"],
+      daypart_fit: ["Hợp giờ này", "Right now"], persona_match: ["Hợp gu bạn", "For you"],
+    };
     grid.innerHTML = recs.map((r, i) => {
       const a = W.addons.get(r.id);
+      const tag = AO_TAG[r.strategy];
       return `
       <div class="addon-card ${a ? "picked" : ""}" data-addon="${r.id}" style="animation-delay:${i * 80}ms">
+        ${tag ? `<span class="mc-badge">${S.lang === "vi" ? tag[0] : tag[1]}</span>` : ""}
         ${imgTag(r, "mc-img", "mc-img-ph")}
         <span class="ao-name">${S.lang === "en" && r.name_en ? r.name_en : r.name}</span>
         <span class="ao-pitch">${S.lang === "vi" ? r.pitch_vn : r.pitch_en}</span>
@@ -691,6 +753,7 @@
     if (btn.id === "btn-start") {
       KFC.rotateSession();  // new customer, fresh (background) hypothesis
       S.orderType = null; S.cart = []; S.voucher = null; S.loyalty = null; W = null;
+      S.popupShown = false; $("#promo-pop")?.remove();
       postEvent("session_start", "new customer session (background profiling active)");
       renderBottomBar();
       show("ordertype");
@@ -700,6 +763,8 @@
       postEvent("tap", `order type: ${S.orderType}`);
       observe(`chose order type: ${S.orderType}`);
       show("menu");
+      // the algorithm's one deal for this session — after the menu settles
+      setTimeout(showPromoPop, 900);
     }
     else if (btn.dataset.cat) { S.activeCat = btn.dataset.cat; renderMenuRail(); renderGrid(); postEvent("tap", `category: ${btn.dataset.cat}`); }
     else if (btn.hasAttribute("data-home") || btn.id === "btn-home") {

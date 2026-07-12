@@ -8,7 +8,7 @@ Two prepared photos in a folder on the desktop: ① mother with child ② man in
 
 ## PRE-FLIGHT (15 minutes before going on)
 
-1. `node test/api-test.mjs https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev` → **70 green**.
+1. `node test/api-test.mjs https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev` → **78 green**.
 2. Order board cluttered from testing? `npm run seed:remote` (~30s), re-run step 1.
 3. Open `/` in Chrome, F11 full-screen, zoom 100%. Scenario pill must read **"Thời gian thực"**
    (if not: 🎬 → "↺ Về thời gian thực").
@@ -31,8 +31,16 @@ Two prepared photos in a folder on the desktop: ① mother with child ② man in
 
 ## 0:20 — SCENE 1 · The invisible profiler + the live rec window (40s)
 
-**DO:** Tap **Chạm để bắt đầu** → **Ăn tại đây**. Then on the ops panel click
-**📷 inject camera frame** → pick photo ① (mother with child).
+**DO:** Tap **Chạm để bắt đầu** → **Ăn tại đây**. About a second later the
+**poster deal popup** appears (Gemini-designed art, list price struck through):
+
+> "Before anything else the algorithm pops ONE deal it picked for this session —
+> like the promo posters you see on Shopee, except an agent chose it. The struck
+> price is the real list price — the dish alone qualifies for the voucher, so
+> 'was 399, now 339' is literally true. One tap adds it WITH the code applied."
+
+Tap **Để sau** (*"we'll pass — and notice it never asks twice"*).
+Then on the ops panel click **📷 inject camera frame** → pick photo ① (mother with child).
 
 **POINT AT** (in order):
 - The kiosk: *"the exact journey KFC customers already know — and the complete real menu,
@@ -48,9 +56,11 @@ Two prepared photos in a folder on the desktop: ① mother with child ② man in
 
 ## 1:00 — SCENE 2 · One order, four psychology plays (50s)
 
-**DO:** rail **GÀ RÁN - GÀ QUAY** — point at the grid first: *"notice the badges and the
-order — every category just re-ranked itself for THIS customer, this store, this hour.
-The menu is the recommendation."* → open **"1 Miếng Gà Rán"**.
+**DO:** rail **GÀ RÁN - GÀ QUAY** — point at the grid first: *"notice the red
+best-seller and deal tags on the photos — e-commerce grammar, but honest: only real
+POS counts and live promos may write them, never margin — and the whole order just
+re-ranked itself for THIS customer, this store, this hour. The menu is the
+recommendation."* → open **"1 Miếng Gà Rán"**.
 1. **MEAL SIZE** appears — point at the green **TIẾT KIỆM** flag on the combo card:
    > "Loss aversion — but pointed at the customer's wallet. Honest math, computed live."
    Choose **MÓN LẺ** (item only) — *"watch what it does about that in a moment."* → TIẾP TỤC.
@@ -119,6 +129,7 @@ ticker, Christmas combos appear, the rec window re-computes with 🏷️ promo c
 | "Predictive analytics?" | `/admin` → Tổng quan: demand-by-daypart forecast + projected stockout ETAs from 90 days of POS |
 | "What if the LLM is down/slow?" | It already survives: pitches race a 1.2s timeout into deterministic copy; the scorer is pure math. (This happens live sometimes — nothing visibly breaks.) |
 | "Privacy?" | Coarse bands only (age band/attire/group), no identity, no photo storage, hypothesis dies with the session. Show the panel: it literally says "guess". |
+| "Isn't the popup / are the badges manipulative?" | Show the tests: badges have an honesty whitelist (margin/inventory can never write customer copy) and the popup's strike price must be satisfiable by the dish alone — both are E2E-asserted. One popup per session, no-nag everywhere. |
 | "Human in the loop?" | Kiosk chat API → `handoff_to_human` routes to the first available CS staff; `/admin` → Hỗ trợ shows the queue + live takeover |
 | "Second customer?" | Finish the order → **BẮT ĐẦU ĐƠN MỚI** → inject photo ② (man in suit, office-lunch scenario) — different persona, different dishes |
 | "Cost math?" | Cost panel footnote lists the unit prices (gpt-oss $0.35/$0.75 per M tokens, D1 $0.001/M reads…) — sources: developers.cloudflare.com pricing pages |
@@ -143,7 +154,8 @@ ticker, Christmas combos appear, the rec window re-computes with 🏷️ promo c
   (Team+Promise · Problem Insight · Agentic Workflow · Evidence+Impact · Why It Wins · Demo+Close).
   ⚠️ Slide 1 says "MatViet Design Team" — edit if that's not the registered team name.
 - Screenshots: `4k-v4-prod.png`, `asset-*.png` (journey steps, panels), `v5-*.jpeg`, `v4-xmas-scenario.jpeg`
-- Tests: `node test/api-test.mjs <url>` → 70 assertions
+- Tests: `node test/api-test.mjs <url>` → 78 assertions
+- **Presenter console: https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev/keynote** — slides + this script + Q&A in one page
 - Declared stack (bonus prizes): **TinyFish** (menu crawl) · **OpenAI gpt-oss-120b** via
   **Cloudflare Workers AI** · **Cloudflare** Workers/D1/assets · **Gemini** (product/hero
   imagery) · **Langfuse-ready** tracing

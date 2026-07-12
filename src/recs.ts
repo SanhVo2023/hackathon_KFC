@@ -126,9 +126,74 @@ export async function rankCatalog(
       : dominant === "daypart" ? (festive ? "Hợp dịp này" : `Hợp ${DAYPART_VN[daypart] ?? daypart}`)
       : "Bán chạy";
   }
+  // e-commerce-style tags beyond the top pick — still honest signals only,
+  // and capped per category so tags stay meaningful: 1 extra promo tag +
+  // 2 genuine fast movers (real local POS counts). Margin/inventory still
+  // never write customer copy.
+  const byCat = new Map<string, typeof items>();
+  for (const m of items) {
+    if (!byCat.has(m.category)) byCat.set(m.category, []);
+    byCat.get(m.category)!.push(m);
+  }
+  for (const catItems of byCat.values()) {
+    const onPromo = (m: typeof items[number]) => activePromos.some((p) =>
+      (p.item_id != null && p.item_id === m.id) || (p.scope_category != null && p.scope_category === m.category));
+    const bestPromo = catItems.filter((m) => !m.badge && onPromo(m))
+      .sort((a, b) => (b.rank_score ?? 0) - (a.rank_score ?? 0))[0];
+    if (bestPromo) bestPromo.badge = "Đang ưu đãi";
+    [...catItems].sort((a, b) => (b.pop_cnt ?? 0) - (a.pop_cnt ?? 0)).slice(0, 2)
+      .forEach((m) => { if (!m.badge && (m.pop_cnt ?? 0) >= 15) m.badge = "Bán chạy"; });
+  }
   tel.emit("rec_scored", "rec", "kiosk",
     `menu personalized: ${items.length} items re-ranked (${store.cluster}/${daypart}${profile ? ` × "${(profile.persona ?? "").slice(0, 40)}…"` : ", cold start"})`,
     undefined, Date.now() - t0);
+}
+
+// ---------- promo spotlight: the popup is picked by the algorithm ----------
+// One deal, one concrete dish, honest strike-through math: the chosen item
+// ALONE must satisfy the promo's min_order, so "was X, now Y" is literally
+// true for the customer standing there. Call AFTER rankCatalog (uses rank_score).
+export interface PromoSpotlight {
+  code: string; name: string; description: string | null;
+  kind: string; value: number; min_order: number;
+  item_id: number; item_name: string; item_name_en: string | null;
+  image_url: string | null; original_price: number; deal_price: number;
+}
+
+export async function promoSpotlight(
+  env: Env, tel: Telemetry,
+  items: (MenuItem & { stock?: number; rank_score?: number })[],
+  daypart: Daypart, dow: number, festive: boolean,
+): Promise<PromoSpotlight | null> {
+  const rs = await env.DB.prepare("SELECT * FROM promotions WHERE active=1").all();
+  const promos = (rs.results as unknown as Promo[]).filter((p) =>
+    promoApplies(p, daypart, dow) && (p.kind === "percent" || p.kind === "amount"));
+  let best: { promo: Promo; item: typeof items[number]; deal: number; score: number } | null = null;
+  for (const p of promos) {
+    const candidates = items.filter((m) =>
+      (p.item_id != null ? m.id === p.item_id : true) &&
+      (p.scope_category != null ? m.category === p.scope_category : true) &&
+      m.price >= (p.min_order ?? 0) && m.image_url);
+    const pick = candidates.sort((a, b) => (b.rank_score ?? 0) - (a.rank_score ?? 0))[0];
+    if (!pick) continue;
+    const deal = p.kind === "percent"
+      ? Math.round((pick.price * (1 - p.value / 100)) / 1000) * 1000
+      : pick.price - p.value;
+    if (deal <= 0 || deal >= pick.price) continue;
+    // festive promos own the festive session; otherwise best-ranked dish wins
+    const score = (pick.rank_score ?? 0) + (festive && /noel|giáng sinh/i.test(p.name) ? 10 : 0);
+    if (!best || score > best.score) best = { promo: p, item: pick, deal, score };
+  }
+  if (!best) return null;
+  tel.emit("strategy", "rec", "kiosk",
+    `promo popup: ${best.promo.code} → ${best.item.name} (${best.item.price.toLocaleString("vi-VN")}₫ gạch còn ${best.deal.toLocaleString("vi-VN")}₫, agent-picked)`,
+    { code: best.promo.code, item_id: best.item.id });
+  return {
+    code: best.promo.code, name: best.promo.name, description: best.promo.description ?? null,
+    kind: best.promo.kind, value: best.promo.value, min_order: best.promo.min_order ?? 0,
+    item_id: best.item.id, item_name: best.item.name, item_name_en: best.item.name_en ?? null,
+    image_url: best.item.image_url ?? null, original_price: best.item.price, deal_price: best.deal,
+  };
 }
 
 export async function recommend(

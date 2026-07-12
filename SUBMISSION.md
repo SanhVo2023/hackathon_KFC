@@ -74,6 +74,7 @@ Nightly POS export integration (the engine already reads plain co-occurrence/pop
 
 ## Optional links
 - Live desktop ops view: https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev
+- Keynote console (slides + demo script + Q&A): https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev/keynote
 - Standalone kiosk: https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev/kiosk
 - Admin control center: https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev/admin
 - Pitch deck: `slide-deck.pdf` in the repo · Demo run sheet: `PITCH.md` · AI usage: `AI-DOCUMENTATION.md`

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KFC Kiosk Agent — Keynote Console</title>
+<link rel="icon" href="/brand/kfc-logo.png" />
+<style>
+  :root { --red:#E4002B; --ink:#0E1116; --panel:#151A22; --panel2:#1B212C; --line:#242B38; --gold:#F2A900; --green:#3FB68B; --dim:#8B93A3; --text:#E8EAEF; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--ink); color:var(--text); font-family:'Segoe UI', Arial, sans-serif; line-height:1.5; }
+  .wrap { max-width:1060px; margin:0 auto; padding:36px 24px 90px; }
+  header.hero { text-align:center; padding:26px 0 8px; }
+  .hero h1 { font-size:40px; font-weight:900; letter-spacing:-.02em; }
+  .hero h1 span { color:var(--red); }
+  .hero p { color:var(--dim); font-weight:600; margin-top:4px; }
+  .links { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin:22px 0 8px; }
+  .links a {
+    background:var(--panel); border:1px solid var(--line); color:var(--text);
+    border-radius:999px; padding:10px 20px; font-weight:800; font-size:15px; text-decoration:none;
+  }
+  .links a.primary { background:var(--red); border-color:var(--red); color:#fff; }
+  .links a:hover { border-color:var(--gold); }
+  h2.sec { font-size:15px; font-weight:800; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); margin:44px 0 14px; display:flex; align-items:center; gap:12px; }
+  h2.sec::after { content:""; flex:1; height:1px; background:var(--line); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px 22px; margin-bottom:12px; }
+  .check { display:flex; gap:12px; align-items:baseline; padding:7px 0; border-bottom:1px solid var(--line); font-size:15.5px; }
+  .check:last-child { border-bottom:0; }
+  .check b { color:var(--gold); flex:0 0 22px; }
+  code, kbd { font-family:Consolas, monospace; background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:1px 7px; font-size:13.5px; color:#CDD3DE; }
+  /* script timeline */
+  .beat { display:flex; gap:18px; margin-bottom:12px; }
+  .beat .t { flex:0 0 74px; text-align:right; font-family:Consolas,monospace; font-weight:800; color:var(--red); font-size:15px; padding-top:19px; }
+  .beat .body { flex:1; background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--red); border-radius:12px; padding:14px 20px; }
+  .beat h3 { font-size:17px; font-weight:900; margin-bottom:6px; }
+  .do { font-size:14.5px; color:var(--text); margin:6px 0; }
+  .do b { color:var(--gold); letter-spacing:.06em; font-size:12.5px; }
+  .say { font-size:14.5px; color:#C9CEDA; border-left:3px solid var(--gold); background:var(--panel2); border-radius:0 8px 8px 0; padding:8px 14px; margin:8px 0; font-style:italic; }
+  .tap { display:inline-block; background:var(--panel2); border:1px solid var(--line); border-radius:7px; padding:1px 9px; font-weight:800; font-size:13px; color:#fff; white-space:nowrap; }
+  /* Q&A */
+  details { background:var(--panel); border:1px solid var(--line); border-radius:12px; margin-bottom:9px; overflow:hidden; }
+  details summary { cursor:pointer; padding:13px 20px; font-weight:800; font-size:15.5px; list-style:none; display:flex; gap:10px; }
+  details summary::before { content:"?"; color:var(--red); font-weight:900; }
+  details[open] summary { border-bottom:1px solid var(--line); color:var(--gold); }
+  details .a { padding:13px 20px; font-size:14.5px; color:#C9CEDA; }
+  details .a b { color:#fff; }
+  details .a .show { display:block; margin-top:8px; color:var(--green); font-weight:700; font-size:13.5px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:800px){ .grid2{grid-template-columns:1fr} .beat{flex-direction:column} .beat .t{text-align:left; padding-top:0} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>KFC Kiosk Agent <span>· Keynote Console</span></h1>
+  <p>Team Sanhvo — 3-min pitch + live demo + 1-min Q&amp;A · everything on one page</p>
+  <nav class="links">
+    <a class="primary" href="/deck.html" target="_blank">▶ Slide deck (arrow keys)</a>
+    <a href="/" target="_blank">Ops view (demo stage)</a>
+    <a href="/kiosk" target="_blank">Kiosk</a>
+    <a href="/admin" target="_blank">Admin</a>
+    <a href="/demo.mp4" target="_blank">Backup video (76s)</a>
+  </nav>
+</header>
+
+<h2 class="sec">Pre-flight — 15 minutes before going on</h2>
+<div class="card">
+  <div class="check"><b>1</b><span><code>node test/api-test.mjs https://kfc-kiosk-agent.gentle-sky-3b0e.workers.dev</code> → <b style="color:var(--green)">78 green</b>. Board cluttered? <code>npm run seed:remote</code> (~30s), re-run.</span></div>
+  <div class="check"><b>2</b><span>Open <b>/</b> in Chrome, F11 full-screen, zoom 100%. Scenario pill must read <span class="tap">Thời gian thực</span> (if not: 🎬 → ↺ Về thời gian thực).</span></div>
+  <div class="check"><b>3</b><span><b>Warm-up run:</b> one throwaway order end-to-end, then <span class="tap">BẮT ĐẦU ĐƠN MỚI</span> — warms every model, zeroes the cost meter, blanks the hypothesis. Leave it on the attract screen.</span></div>
+  <div class="check"><b>4</b><span>Two customer photos ready on the desktop: ① mother with child ② man in a suit (or use <code>/img/customer-demo.jpg</code>).</span></div>
+  <div class="check"><b>5</b><span>Backup: phone hotspot · <code>npm run dev</code> local mirror · <a href="/demo.mp4" style="color:var(--green)">/demo.mp4</a> if all else fails.</span></div>
+</div>
+
+<h2 class="sec">Demo script — one continuous take</h2>
+
+<div class="beat"><div class="t">0:00</div><div class="body">
+  <h3>HOOK — attract screen glowing, touch nothing</h3>
+  <div class="say">"KFC Vietnam runs 250+ stores of kiosks showing the same static menu to everyone — marketing hand-picks the 'you may also like' box once a month. KFC's own estimate: 15–20% of order value left on the table. We built a kiosk with a <b>salesperson's brain</b>. On the right you can watch it think — and there's a cost meter, because the punchline is what this brain costs: less than the smallest coin in your pocket, per customer."</div>
+</div></div>
+
+<div class="beat"><div class="t">0:20</div><div class="body">
+  <h3>SCENE 1 — the deal poster + the invisible profiler</h3>
+  <div class="do"><b>DO</b> — tap <span class="tap">Chạm để bắt đầu</span> → <span class="tap">Ăn tại đây</span>. ~1s later the <b>poster deal popup</b> appears.</div>
+  <div class="say">"Before anything else, the algorithm pops ONE deal it picked for this session — like the promo posters on Shopee, except an agent chose it, and the math is honest: the struck price is the real list price, and this dish alone qualifies for the voucher. One tap adds it with the code applied."</div>
+  <div class="do"><b>DO</b> — tap <span class="tap">Để sau</span> <i>("we'll pass — and notice it never asks twice")</i>. Then ops panel → <span class="tap">📷 inject camera frame</span> → photo ① (mother with child).</div>
+  <div class="say">"One coarse camera glance — age band, group, never identity, nothing stored — plus every tap after it. Below the hypothesis: the ACTUAL three dishes the engine would serve this customer at this second, each tagged with the psychology play behind it."</div>
+</div></div>
+
+<div class="beat"><div class="t">1:00</div><div class="body">
+  <h3>SCENE 2 — one order, four psychology plays</h3>
+  <div class="do"><b>DO</b> — rail <span class="tap">GÀ RÁN - GÀ QUAY</span>, point at the grid first.</div>
+  <div class="say">"The red best-seller and deal tags — e-commerce grammar, but honest: only real POS counts and live promos may write them, never margin. And the order just re-ranked itself for THIS customer, this store, this hour. The menu is the recommendation."</div>
+  <div class="do"><b>DO</b> — open <span class="tap">1 Miếng Gà Rán</span> → MEAL SIZE: point at the green TIẾT KIỆM flag <i>("loss aversion, pointed at the customer's wallet")</i> → choose <span class="tap">MÓN LẺ</span> → TIẾP TỤC → CUSTOMIZE: one line passing <i>("three upsize tiers — the middle one is a decoy, the movie-popcorn play")</i> → TIẾP TỤC.</div>
+  <div class="do"><b>DO</b> — ADD ON renders instantly (preemptive).</div>
+  <div class="say">"This screen exists on every KFC kiosk — the difference is the AI picks what's on it. Chicken with no drink → a drink LEADS: drinks run 90%+ margin, the cross-subsidy engine of fast food. Read the copy: 'giòn rụm', 'mát lạnh', real attach rates."</div>
+  <div class="do"><b>DO</b> — <span class="tap">+</span> drink, <span class="tap">+</span> side → TIẾP TỤC → THÊM VÀO GIỎ → HOÀN TẤT ĐƠN HÀNG.</div>
+</div></div>
+
+<div class="beat"><div class="t">1:50</div><div class="body">
+  <h3>SCENE 3 — the kindness moment</h3>
+  <div class="do"><b>DO</b> — the swap banner fires → tap <span class="tap">ĐỔI</span>.</div>
+  <div class="say">"It just took money OFF the bill. Deliberate. Trust before upsell — that's a salesperson customers come back to. And now that the meal is complete: no more bundles. It completes meals, never stacks them."</div>
+  <div class="do"><b>DO</b> — <span class="tap">THANH TOÁN</span> → point at the single AI chip <i>("one last small thing, never a wall")</i> → pay → on confirmation point at the <b>comeback voucher</b> <i>("aimed at a QUIET daypart — it grows tomorrow's traffic too")</i>.</div>
+</div></div>
+
+<div class="beat"><div class="t">2:15</div><div class="body">
+  <h3>SCENE 4 — Đêm Giáng Sinh, one tap</h3>
+  <div class="do"><b>DO</b> — 🎬 Scenario → <span class="tap">🎄 Đêm Giáng Sinh</span>. Kiosk re-dresses, Noel promo hits the ticker, rec window recomputes with 🏷️ promo chips.</div>
+  <div class="say">"One tap: a residential store on Christmas Eve — holiday combos live, Noel promo active, desserts overstocked and being pushed before they're wasted. 250 stores are not one store. Any store, any hour, any holiday — stageable by a non-technical operator."</div>
+</div></div>
+
+<div class="beat"><div class="t">2:40</div><div class="body">
+  <h3>CLOSE — the money slide</h3>
+  <div class="do"><b>DO</b> — point at 💰 CHI PHÍ / PHIÊN, then stop moving.</div>
+  <div class="say">"Everything you just watched — the glance, every hypothesis update, every recommendation — cost about fifteen đồng of infrastructure, at Cloudflare's public list prices, itemized on screen. The AI lifts average order value +15%, about 28,000₫ per order — a thousand-fold return per customer, measured, not promised. One Worker, one database, the real menu crawled by TinyFish, OpenAI's gpt-oss on Workers AI. It deploys to 250 stores inside the 90-day window."</div>
+  <div class="do"><b>STOP TALKING.</b> That's the end beat.</div>
+</div></div>
+
+<h2 class="sec">Preemptive Q&amp;A — show, don't tell</h2>
+
+<details><summary>"Isn't this just a chatbot / a wrapper around an LLM?"</summary><div class="a">No chat anywhere in the customer journey. A deterministic 8-signal scorer decides <b>what</b> to recommend in ~70ms; LLMs only write the voice and read the camera. The agent senses (camera + taps + cart), plans (strategy per slot), acts (7 journey surfaces + popup), and verifies (logged counterfactual).<span class="show">SHOW → the system diagram: the agent-loop ribbon lights OBSERVE → HYPOTHESIZE → DECIDE → ACT → VERIFY as it works.</span></div></details>
+
+<details><summary>"How do you know it's +15%? Is the number honest?"</summary><div class="a">Stratified baseline orders vs AI-assisted orders, logged as a counterfactual on production. Every impression and accept is written to D1 — and ops-view probes are excluded so the panel can't inflate acceptance. 78 automated assertions run against the live URL, several of them guarding metric honesty.<span class="show">SHOW → run <code>node test/api-test.mjs &lt;prod&gt;</code> live if they want blood.</span></div></details>
+
+<details><summary>"Privacy — you're pointing a camera at customers?"</summary><div class="a">One coarse glance: age band, attire, group size. No identity, no face matching, no photo storage — the hypothesis literally says "guess" with a confidence bar, and it dies with the session. Behavioral signals alone work fine if the camera is off.<span class="show">SHOW → the hypothesis panel wording + confidence meter.</span></div></details>
+
+<details><summary>"Aren't the red badges and the popup manipulative?"</summary><div class="a">The opposite — they're honesty-constrained: only real POS counts and live promos may write customer-facing copy; margin and inventory motives are <b>whitelisted out and E2E-tested</b>. The popup's struck price must be satisfiable by that dish alone, one popup per session, and anything ignored twice rests (no-nag).<span class="show">SHOW → tests "badges never expose margin/inventory motives" + "spotlight strike price is honest".</span></div></details>
+
+<details><summary>"What if the LLM is slow or down?"</summary><div class="a">The UX survives total LLM outage: pitches race a 1.2s timeout into deterministic sensory copy, the scorer is pure math, vision has a fallback model. This actually happens live sometimes — nothing visibly breaks.</div></details>
+
+<details><summary>"Show me the decoy actually working."</summary><div class="a">Open any combo → CUSTOMIZE → tap <b>Khoai Đại</b> — the event stream prints "decoy landed: asymmetric dominance". Three tiers, the middle one exists to make the big one look rational.</div></details>
+
+<details><summary>"How do stores differ? Does this scale to 250?"</summary><div class="a">Each store belongs to a cluster (mall/office/residential/tourist) with its own co-occurrence and popularity tables, live inventory, and holiday calendar. One Worker + one D1 serves them all — per-store context is data, not deployment.<span class="show">SHOW → /admin → AI Gợi ý → Chạy thử: Landmark 81/lunch vs Vincom/dinner — visibly different slates.</span></div></details>
+
+<details><summary>"Where does the data come from today / how would real POS plug in?"</summary><div class="a">Today: 9,000 synthetic baskets shaped by cluster × daypart. The engine reads plain co-occurrence/popularity tables — a nightly POS export lands in the same schema. The menu is already real: 106 items crawled live from kfcvietnam.com.vn by TinyFish agents.</div></details>
+
+<details><summary>"What does it cost at scale?"</summary><div class="a">~13₫ (~$0.0005) per customer session at Cloudflare list prices — itemized live in the cost panel (gpt-oss $0.35/$0.75 per M tokens, D1 $0.001/M reads…). At 250 stores × 500 sessions/day that's ~$60/day of AI for a measured +28,000₫ per order uplift.</div></details>
+
+<details><summary>"Human in the loop?"</summary><div class="a">The P4 ordering agent has a <code>handoff_to_human</code> tool that routes to the first available CS staff; /admin → Hỗ trợ shows the queue with live takeover. The agent knows what it shouldn't decide.</div></details>
+
+<details><summary>"What happens with a second, different customer?"</summary><div class="a">Finish the order → BẮT ĐẦU ĐƠN MỚI → inject photo ② (man in a suit). Different persona, different bias bars, different dishes in the live window — same journey.</div></details>
+
+<details><summary>"Why Cloudflare Workers AI instead of the OpenAI API?"</summary><div class="a">Everything lives at the edge in one deployment: inference, D1, static assets, telemetry — no cross-cloud latency, one bill, and gpt-oss-120b on Workers AI is fast enough (2–7s agent turns, 1.2s-raced pitches). It also makes the cost meter exact: one provider's list prices.</div></details>
+
+<h2 class="sec">Contingencies</h2>
+<div class="grid2">
+  <div class="card">📷 <b>Photo inject fails</b> — keep going: the hypothesis fills from behavior alone (designed to).</div>
+  <div class="card">🍽 <b>Rec strip empty at attract</b> — populates on the first session event; tap start and continue.</div>
+  <div class="card">📶 <b>Venue wifi dies</b> — laptop <code>npm run dev</code> + local seed = full mirror at 127.0.0.1:8787. Or play <a href="/demo.mp4" style="color:var(--green)">/demo.mp4</a>.</div>
+  <div class="card">🧊 <b>Anything looks stale</b> — 🎬 → ↺ Về thời gian thực, finish the order, BẮT ĐẦU ĐƠN MỚI.</div>
+</div>
+
+</div>
+</body>
+</html>

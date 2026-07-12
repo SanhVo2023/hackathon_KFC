@@ -11,7 +11,6 @@
 <body class="desktop-body">
   <header class="dt-header">
     <div class="dt-brand"><span class="dt-logo">KFC</span> Kiosk <span class="dt-x">×</span> Agentic AI <span class="dt-sub">Live System View</span></div>
-    <div class="dt-stats" id="dt-stats"></div>
     <nav class="dt-links">
       <button class="dt-scenario-btn" id="scenario-btn">🎬 <span id="scenario-label">Thời gian thực</span></button>
       <a href="/kiosk" target="_blank">Kiosk ↗</a>
@@ -39,7 +38,7 @@
     <section class="dt-right">
       <div class="dt-diagram-panel">
         <div class="panel-title">SYSTEM DIAGRAM <span class="pt-hint">edges pulse as the agent works</span></div>
-        <svg id="diagram" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg id="diagram" viewBox="0 0 1600 540" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
       <div class="dt-profile-panel">
         <div class="panel-title">👁 CUSTOMER HYPOTHESIS
@@ -58,7 +57,15 @@
       </div>
       <div class="dt-bottom-row">
         <div class="dt-log-panel">
-          <div class="panel-title">EVENT STREAM <span class="pt-hint" id="log-count"></span></div>
+          <div class="panel-title">EVENT STREAM
+            <span class="pt-right">
+              <span class="log-filter" id="log-filter">
+                <button class="lf-btn on" data-f="all">tất cả</button>
+                <button class="lf-btn" data-f="agent">⚡ agent</button>
+              </span>
+              <span class="pt-hint" id="log-count"></span>
+            </span>
+          </div>
           <div class="log-scroll" id="log-scroll"></div>
         </div>
         <aside class="dt-cost-panel">

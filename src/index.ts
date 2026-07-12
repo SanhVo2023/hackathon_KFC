@@ -5,7 +5,7 @@
 // /api/*       -> kiosk + agent + admin APIs (D1-grounded)
 
 import { runAgent } from "./agent";
-import { recommend, rankCatalog, getStore, type CartLine } from "./recs";
+import { recommend, rankCatalog, promoSpotlight, getStore, type CartLine } from "./recs";
 import { placeOrder } from "./tools";
 import { profileFromPhoto, refineProfile, getProfile } from "./profiler";
 import { Telemetry, handleTelemetryGet, vnNow, getContext } from "./telemetry";
@@ -82,9 +82,12 @@ async function handlePublic(
     // session × store × hour so the kiosk can quietly reorder each category
     const sessionId = request.headers.get("x-session-id") ?? "anon";
     await rankCatalog(env, tel, sessionId, rs.results as never, store, ctx.daypart, ctx.dow, ctx.festive);
+    // agent-picked promo popup: one deal, one dish, honest strike-through
+    const spotlight = await promoSpotlight(env, tel, rs.results as never, ctx.daypart, ctx.dow, ctx.festive);
     return json({
       items: rs.results, store, festive: ctx.festive, holiday: ctx.holiday,
       daypart: ctx.daypart, dow: ctx.dow, scenario: ctx.scenario?.label ?? null,
+      promo_spotlight: spotlight,
     });
   }
 

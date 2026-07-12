@@ -181,6 +181,57 @@ body.xmas .attract-title::after { content: " 🎄"; font-size: 6cqw; }
 }
 .section-sub { font-size: 2cqw; font-weight: 600; color: #444; margin: -1.4cqw 0 2cqw; }
 
+/* ---------- promo popup — poster deal the algorithm picked ---------- */
+.promo-pop {
+  position: absolute; inset: 0; z-index: 60;
+  background: rgba(24, 10, 8, .55); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  animation: ppFade .25s ease;
+}
+@keyframes ppFade { from { opacity: 0; } to { opacity: 1; } }
+.pp-card {
+  position: relative; width: 74cqw; max-height: 88cqh;
+  background: #fff; border-radius: 1.8cqw; overflow: hidden;
+  box-shadow: 0 3cqw 9cqw rgba(0, 0, 0, .45);
+  animation: ppIn .38s cubic-bezier(.2, .9, .3, 1.15);
+}
+@keyframes ppIn { from { opacity: 0; transform: translateY(4cqw) scale(.92); } to { opacity: 1; transform: none; } }
+.pp-close {
+  position: absolute; top: 1.2cqw; right: 1.2cqw; z-index: 2;
+  width: 4.2cqw; height: 4.2cqw; border-radius: 50%; border: 0;
+  background: rgba(255, 255, 255, .92); color: #333;
+  font-size: 2cqw; font-weight: 800;
+}
+.pp-art { position: relative; aspect-ratio: 4 / 3; background: #1a0f0c; }
+.pp-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pp-flag {
+  position: absolute; top: 1.4cqw; left: 1.4cqw;
+  background: var(--kfc-red); color: #fff;
+  border-radius: .6cqw; padding: .55cqw 1.4cqw;
+  font-size: 1.7cqw; font-weight: 900; letter-spacing: .06em;
+  box-shadow: 0 .4cqw 1.2cqw rgba(228, 0, 43, .45);
+}
+.pp-body { padding: 2.2cqw 2.6cqw 2.4cqw; text-align: center; display: flex; flex-direction: column; gap: 1cqw; }
+.pp-body h3 { font-size: 2.7cqw; font-weight: 900; line-height: 1.2; letter-spacing: -.01em; }
+.pp-item { font-size: 1.9cqw; font-weight: 700; color: #444; }
+.pp-prices { display: flex; align-items: baseline; justify-content: center; gap: 1.4cqw; }
+.pp-prices s { font-size: 2.1cqw; color: #9a9a9a; font-weight: 600; }
+.pp-deal { font-size: 3.6cqw; font-weight: 900; color: var(--kfc-red); }
+.pp-off {
+  background: #FFE3E8; color: var(--kfc-red); border-radius: .5cqw;
+  padding: .3cqw .9cqw; font-size: 1.7cqw; font-weight: 900;
+}
+.pp-cta {
+  margin-top: .6cqw; border: 0; border-radius: 1cqw;
+  background: var(--kfc-red); color: #fff;
+  padding: 1.9cqw; font-size: 2.2cqw; font-weight: 800;
+}
+.pp-cta:active { transform: scale(.98); }
+.pp-later { background: none; border: 0; color: #8a8a8a; font-size: 1.8cqw; font-weight: 600; padding: .6cqw; }
+.pp-note { font-size: 1.35cqw; color: #a0a0a0; }
+.pp-note::first-letter { color: var(--ai-gold); }
+body.xmas .pp-flag { background: #0E5B36; box-shadow: 0 .4cqw 1.2cqw rgba(14, 91, 54, .45); }
+
 /* ---------- menu grid (3-col, like the real kiosk) ---------- */
 .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2cqw; padding-bottom: 6cqw; }
 .menu-card {
@@ -191,11 +242,14 @@ body.xmas .attract-title::after { content: " 🎄"; font-size: 6cqw; }
   box-shadow: 0 .4cqw 1.4cqw rgba(0,0,0,.04);
   animation: cardIn .3s ease backwards;
 }
+/* e-commerce style: red tag, white text, on the photo top-right —
+   so customers instantly see what sells / what's on deal (user feedback) */
 .mc-badge {
-  position: absolute; top: .8cqw; left: .8cqw; z-index: 2;
-  background: #FFF4D6; color: #8A6400; border: 1px solid #F2A900;
-  border-radius: 99px; padding: .25cqw 1cqw;
-  font-size: 1.35cqw; font-weight: 800;
+  position: absolute; top: .9cqw; right: .9cqw; z-index: 2;
+  background: var(--kfc-red); color: #fff;
+  border-radius: .5cqw; padding: .35cqw 1cqw;
+  font-size: 1.35cqw; font-weight: 800; letter-spacing: .01em;
+  box-shadow: 0 .3cqw .9cqw rgba(228, 0, 43, .35);
 }
 @keyframes cardIn { from { opacity: 0; transform: translateY(1.8cqw); } to { opacity: 1; transform: none; } }
 .mc-img, .mc-img-ph {
@@ -295,11 +349,13 @@ body.xmas .attract-title::after { content: " 🎄"; font-size: 6cqw; }
 .ao-note .ai-badge { font-size: 1.4cqw; padding: .4cqw 1.2cqw; }
 .addon-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2cqw; }
 .addon-card {
+  position: relative;
   background: #fff; border: 1px solid #ececec; border-radius: .8cqw;
   padding: 1.4cqw; text-align: center;
   display: flex; flex-direction: column; gap: .8cqw; align-items: center;
   animation: cardIn .3s ease backwards;
 }
+.addon-card .mc-badge { font-size: 1.5cqw; }
 .addon-card .mc-img, .addon-card .mc-img-ph { width: 75%; }
 .ao-name { font-size: 1.7cqw; font-weight: 700; line-height: 1.3; }
 .ao-pitch { font-size: 1.45cqw; color: #8a6100; line-height: 1.35; min-height: 3.8cqw; }

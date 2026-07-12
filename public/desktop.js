@@ -7,28 +7,50 @@
   const SVG = "http://www.w3.org/2000/svg";
   const svg = $("#diagram");
 
-  // ---------- node map ----------
+  // ---------- node map — the real runtime architecture, in 4 lanes ----------
   const NODES = {
-    profiler: { x: 95,  y: 95,  w: 190, h: 84, icon: "👁", name: "Profiler",       sub: "customer hypothesis" },
-    kiosk:    { x: 95,  y: 300, w: 190, h: 84, icon: "🖥️", name: "Kiosk UI",      sub: "self-order · 4K touch" },
-    admin:    { x: 95,  y: 505, w: 190, h: 84, icon: "🛠️", name: "Admin",          sub: "control + scenario" },
-    worker:   { x: 400, y: 300, w: 210, h: 84, icon: "⚡", name: "Worker API",     sub: "Cloudflare edge" },
-    rec:      { x: 720, y: 130, w: 220, h: 84, icon: "✦",  name: "Rec Engine",     sub: "P2 · 8-signal scorer" },
-    agent:    { x: 720, y: 395, w: 220, h: 84, icon: "🤖", name: "Agent Loop",     sub: "P4 · 9 tools" },
-    d1:       { x: 1035, y: 240, w: 190, h: 84, icon: "🗄️", name: "D1 Database",   sub: "menu · POS · orders" },
-    llm:      { x: 1035, y: 445, w: 190, h: 84, icon: "🧠", name: "Workers AI",    sub: "vision + gpt-oss + 8b" },
-    staff:    { x: 400, y: 540, w: 210, h: 74, icon: "👤", name: "CS / Sales",     sub: "human-in-the-loop" },
-    langfuse: { x: 720, y: 560, w: 220, h: 64, icon: "📊", name: "Langfuse",       sub: "tracing-ready", dim: true },
-    tinyfish: { x: 400, y: 70,  w: 210, h: 74, icon: "🐟", name: "TinyFish",       sub: "menu crawl (seed)", dim: true },
+    kiosk:    { x: 60,   y: 170, w: 230, h: 84, icon: "🖥️", name: "Kiosk UI",     sub: "self-order · khách chạm" },
+    admin:    { x: 60,   y: 350, w: 230, h: 84, icon: "🛠️", name: "Admin / Ops",  sub: "scenario · tồn kho · HITL" },
+    worker:   { x: 450,  y: 258, w: 240, h: 84, icon: "⚡", name: "Worker API",   sub: "Cloudflare edge · TypeScript" },
+    profiler: { x: 840,  y: 104, w: 250, h: 84, icon: "👁", name: "Profiler",     sub: "giả thuyết khách · confidence" },
+    rec:      { x: 840,  y: 258, w: 250, h: 84, icon: "✦",  name: "Rec Engine",   sub: "8 tín hiệu + buyer psychology" },
+    agent:    { x: 840,  y: 412, w: 250, h: 84, icon: "🤖", name: "Agent Loop",   sub: "P4 chat · 9 D1 tools" },
+    llm:      { x: 1300, y: 130, w: 240, h: 84, icon: "🧠", name: "Workers AI",   sub: "vision · 8B-fast · gpt-oss" },
+    d1:       { x: 1300, y: 284, w: 240, h: 84, icon: "🗄️", name: "D1 Database",  sub: "menu · POS · tồn kho · đơn" },
+    staff:    { x: 1300, y: 438, w: 240, h: 74, icon: "👤", name: "CS / Sales",   sub: "human-in-the-loop" },
   };
 
-  // static edges drawn up-front (grey rails the pulses ride on)
+  const LANES = [
+    [175, "STOREFRONT"], [570, "EDGE RUNTIME"], [965, "AGENT BRAIN"], [1420, "MODELS + DATA"],
+  ];
+
+  // the agent's working cycle — pills light up as matching events fire
+  const LOOP = [
+    { id: "observe",     label: "👁 OBSERVE" },
+    { id: "hypothesize", label: "🧠 HYPOTHESIZE" },
+    { id: "decide",      label: "✦ DECIDE" },
+    { id: "act",         label: "⚡ ACT" },
+    { id: "verify",      label: "✓ VERIFY" },
+  ];
+
+  // static edges drawn up-front (grey rails the pulses ride on); 3rd item = flow label
   const EDGES = [
-    ["kiosk", "worker"], ["admin", "worker"], ["worker", "rec"], ["worker", "agent"],
-    ["worker", "d1"], ["rec", "d1"], ["rec", "llm"], ["agent", "d1"], ["agent", "llm"],
-    ["agent", "staff"], ["staff", "kiosk"], ["agent", "langfuse"], ["admin", "d1"],
-    ["tinyfish", "d1", true], ["rec", "kiosk"],
-    ["kiosk", "profiler"], ["profiler", "llm"], ["profiler", "rec"],
+    ["kiosk", "worker", "taps · giỏ hàng"],
+    ["admin", "worker"],
+    ["kiosk", "profiler", "hành vi + camera"],
+    ["profiler", "llm", "vision · refine"],
+    ["profiler", "rec", "hypothesis"],
+    ["worker", "rec"],
+    ["rec", "d1", "POS · tồn kho"],
+    ["rec", "llm", "pitch ≤1.2s"],
+    ["rec", "kiosk", "top-3 + strategy"],
+    ["worker", "d1"],
+    ["worker", "agent"],
+    ["agent", "llm", "tool-use"],
+    ["agent", "d1"],
+    ["agent", "staff", "handoff"],
+    ["staff", "kiosk"],
+    ["admin", "d1"],
   ];
 
   const center = (n) => ({ cx: n.x + n.w / 2, cy: n.y + n.h / 2 });
@@ -44,17 +66,48 @@
   function edgeKey(a, b) { return `${a}->${b}`; }
 
   function drawStatic() {
-    for (const [a, b, dashed] of EDGES) {
+    // agent loop ribbon across the top — the Goal→Act→Verify frame
+    const lg = document.createElementNS(SVG, "g");
+    lg.innerHTML = `<text class="dg-lane" x="60" y="38">AGENT LOOP</text>` + LOOP.map((s, i) => {
+      const x = 340 + i * 250;
+      return `
+        ${i ? `<text class="dg-loop-arrow" x="${x - 24}" y="39">›</text>` : ""}
+        <g class="loop-step" id="loop-${s.id}">
+          <rect x="${x}" y="12" width="210" height="40" rx="20"></rect>
+          <text x="${x + 105}" y="38" text-anchor="middle">${s.label}</text>
+        </g>`;
+    }).join("");
+    svg.appendChild(lg);
+
+    for (const [x, name] of LANES) {
+      const t = document.createElementNS(SVG, "text");
+      t.setAttribute("class", "dg-lane");
+      t.setAttribute("x", x); t.setAttribute("y", 86);
+      t.setAttribute("text-anchor", "middle");
+      t.textContent = name;
+      svg.appendChild(t);
+    }
+
+    for (const [a, b, label] of EDGES) {
       const p = document.createElementNS(SVG, "path");
       p.setAttribute("d", edgePath(a, b));
-      p.setAttribute("class", "dg-edge" + (dashed ? " dashed" : ""));
+      p.setAttribute("class", "dg-edge");
       svg.appendChild(p);
       edgeEls[edgeKey(a, b)] = p;
       edgeEls[edgeKey(b, a)] = p;
+      if (label) {
+        const pt = p.getPointAtLength(p.getTotalLength() / 2);
+        const t = document.createElementNS(SVG, "text");
+        t.setAttribute("class", "dg-edge-label");
+        t.setAttribute("x", pt.x); t.setAttribute("y", pt.y - 7);
+        t.setAttribute("text-anchor", "middle");
+        t.textContent = label;
+        svg.appendChild(t);
+      }
     }
     for (const [id, n] of Object.entries(NODES)) {
       const g = document.createElementNS(SVG, "g");
-      g.setAttribute("class", "dg-node" + (n.dim ? " dim" : ""));
+      g.setAttribute("class", "dg-node");
       g.setAttribute("id", `node-${id}`);
       g.innerHTML = `
         <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="14"></rect>
@@ -63,6 +116,24 @@
         <text class="dg-sub" x="${n.x + 56}" y="${n.y + n.h / 2 + 18}">${n.sub}</text>`;
       svg.appendChild(g);
     }
+  }
+
+  // which loop pill does this event light up?
+  function loopStepFor(e) {
+    const t = e.type ?? "";
+    if (/^(rec_accepted|rec_dismissed|llm_timeout|order_status|handoff_status)$/.test(t)) return "verify";
+    if (t === "profile_updated" || e.node_from === "profiler" || e.node_to === "profiler") return "hypothesize";
+    if (/^(rec_request|rec_scored|strategy|smart_swap|tool_call)$/.test(t)) return "decide";
+    if (/^(rec_response|llm_call|llm_result|order_placed|handoff|staff_reply|tool_result)$/.test(t)) return "act";
+    if (e.node_from === "kiosk" || e.source === "kiosk") return "observe";
+    return null;
+  }
+  function lightLoop(id) {
+    const g = $(`#loop-${id}`);
+    if (!g) return;
+    g.classList.add("on");
+    clearTimeout(g._t);
+    g._t = setTimeout(() => g.classList.remove("on"), 1400);
   }
 
   function pulse(a, b, color = "") {
@@ -86,12 +157,35 @@
 
   // ---------- log ----------
   const logEl = $("#log-scroll");
-  let logCount = 0;
-  function addLog(src, label, ms, time) {
+  let logCount = 0, agentCount = 0, logFilter = "all";
+
+  // agent events = the agent's own working: profiling, scoring, strategy
+  // decisions, LLM calls, tool use, handoffs — not request/config plumbing
+  function isAgentEvent(e) {
+    if (/^(rec_|llm_|tool_|strategy|smart_|profile_|chat_|handoff)/.test(e.type ?? "")) return true;
+    const agentNodes = ["rec", "profiler", "agent"];
+    return agentNodes.includes(e.node_from) || agentNodes.includes(e.node_to);
+  }
+  function updateLogCount() {
+    $("#log-count").textContent = logFilter === "agent"
+      ? `${agentCount} agent events` : `${logCount} events`;
+  }
+  $("#log-filter").addEventListener("click", (e) => {
+    const btn = e.target.closest(".lf-btn");
+    if (!btn) return;
+    logFilter = btn.dataset.f;
+    document.querySelectorAll(".lf-btn").forEach((b) => b.classList.toggle("on", b === btn));
+    logEl.classList.toggle("filter-agent", logFilter === "agent");
+    updateLogCount();
+    logEl.scrollTop = logEl.scrollHeight;
+  });
+
+  function addLog(src, label, ms, time, agent = false) {
     logCount++;
-    $("#log-count").textContent = `${logCount} events`;
+    if (agent) agentCount++;
+    updateLogCount();
     const row = document.createElement("div");
-    row.className = "log-row";
+    row.className = "log-row" + (agent ? " agent-ev" : "");
     // D1 created_at is UTC "YYYY-MM-DD HH:MM:SS" — render in local time
     const t = time
       ? new Date(time.replace(" ", "T") + "Z").toTimeString().slice(0, 8)
@@ -118,9 +212,11 @@
   function handleTelemetry(e) {
     if (e.node_from && e.node_to) pulse(e.node_from, e.node_to, colorFor(e));
     else if (e.node_from) glow(e.node_from);
+    const step = loopStepFor(e);
+    if (step) lightLoop(step);
     if (e.type === "profile_updated") { renderProfile(e); queueOpsRecs(); }
     costTrack(e);
-    addLog(e.source, e.label ?? e.type, e.duration_ms, e.created_at);
+    addLog(e.source, e.label ?? e.type, e.duration_ms, e.created_at, isAgentEvent(e));
   }
 
   // ---------- infra cost meter — the ROI slide of the pitch ----------
@@ -266,7 +362,7 @@
       cursor = out.cursor ?? cursor;
       if (firstPoll) {
         // don't replay history: show last 12 as context, no pulses
-        for (const e of events.slice(-12)) addLog(e.source, e.label ?? e.type, e.duration_ms, e.created_at);
+        for (const e of events.slice(-12)) addLog(e.source, e.label ?? e.type, e.duration_ms, e.created_at, isAgentEvent(e));
         firstPoll = false;
         return;
       }
@@ -285,7 +381,7 @@
       if (!out.events?.length) break;
       cursor = out.cursor;
       if (out.events.length < 120) { // last page: render tail as context
-        for (const e of out.events.slice(-12)) addLog(e.source, e.label ?? e.type, e.duration_ms, e.created_at);
+        for (const e of out.events.slice(-12)) addLog(e.source, e.label ?? e.type, e.duration_ms, e.created_at, isAgentEvent(e));
         break;
       }
     }
@@ -298,6 +394,7 @@
     const m = ev.data;
     if (!m || !m.kfcTelemetry) return;
     glow("kiosk", "red");
+    lightLoop("observe");
     if (["add_to_cart", "rec_request", "voucher", "payment"].includes(m.type)) pulse("kiosk", "worker", "red");
     if (m.type === "rec_accepted") pulse("kiosk", "rec", "");
     if (m.type === "handoff") pulse("agent", "staff", "green");
@@ -312,21 +409,12 @@
     addLog("ui", m.label ?? m.type, null);
   });
 
-  // ---------- header stats ----------
+  // ---------- background metrics poll — only feeds the cost panel's ROI line ----------
   async function refreshStats() {
     try {
       const m = await api("/api/admin/metrics");
-      const uplift = m.aov_without_rec_vnd > 0 && m.aov_with_rec_vnd > 0
-        ? Math.round(((m.aov_with_rec_vnd - m.aov_without_rec_vnd) / m.aov_without_rec_vnd) * 100) : null;
       aovUpliftVnd = Math.max(0, (m.aov_with_rec_vnd ?? 0) - (m.aov_without_rec_vnd ?? 0));
-      $("#dt-stats").innerHTML = `
-        <div class="stat"><b>${m.orders}</b><span>orders</span></div>
-        <div class="stat"><b>${(m.revenue_vnd / 1000).toFixed(0)}k₫</b><span>revenue</span></div>
-        <div class="stat gold"><b>${m.rec_acceptance_pct}%</b><span>rec accept</span></div>
-        <div class="stat gold"><b>${uplift != null ? (uplift >= 0 ? "+" : "") + uplift + "%" : "—"}</b><span>AOV uplift (AI)</span></div>
-        <div class="stat"><b>${m.chat_turns}</b><span>chat turns</span></div>
-        <div class="stat"><b>${m.handoffs}</b><span>handoffs</span></div>`;
-    } catch (_) { /* header stats are best-effort */ }
+    } catch (_) { /* best-effort */ }
   }
   refreshStats();
   setInterval(refreshStats, 5000);

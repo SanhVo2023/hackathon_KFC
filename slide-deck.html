@@ -105,7 +105,7 @@
       <p>Chooses its own data &amp; tools: cluster POS pairs, store inventory, promo calendar, profile store, gpt-oss pitch writer; ordering agent wields <b>9 D1-grounded tools</b>.</p>
       <small>D1 batch ~70ms · Workers AI</small></div>
     <div class="step"><h3>⚡ Act</h3>
-      <p>Acts on <b>every step</b> of the native journey: re-ranked menu grid, savings flag, drink-led ADD ON, money-saving swap, last-chance chip, comeback voucher, festive re-skin. Places orders, hands off to humans.</p>
+      <p>Acts on <b>every step</b> of the native journey: re-ranked grid + best-seller tags, <b>poster deal popup</b>, savings flag, drink-led ADD ON, money-saving swap, last-chance chip, comeback voucher, festive re-skin. Places orders, hands off to humans.</p>
       <small>preemptive: computed before the screen opens</small></div>
     <div class="step"><h3>✅ Verify</h3>
       <p>Logs impression → accept → order; computes an <b>honest AOV counterfactual</b>. LLM slow? Falls back to deterministic copy. Never suggests what a store can’t serve.</p>
@@ -113,7 +113,7 @@
   </div>
   <div class="card" style="border-color:var(--gold);">
     <p><b>Decisions the agent makes by itself:</b>
-    <span class="chip g">which psychology play per slot</span><span class="chip g">offer the cheaper swap first</span><span class="chip g">stop selling when the meal is complete</span><span class="chip g">rest an item after 2 unanswered offers</span><span class="chip g">push overstock / protect stockouts</span><span class="chip g">escalate to a human</span></p>
+    <span class="chip g">which psychology play per slot</span><span class="chip g">which deal to pop as a poster</span><span class="chip g">offer the cheaper swap first</span><span class="chip g">stop selling when the meal is complete</span><span class="chip g">rest an item after 2 unanswered offers</span><span class="chip g">push overstock / protect stockouts</span><span class="chip g">escalate to a human</span></p>
   </div>
   <div class="foot">Every decision streams to a live system diagram — the judges can watch it think</div>
 </section>
@@ -139,7 +139,7 @@
   <div class="cols">
     <div>
       <ul>
-        <li><b>74 automated end-to-end assertions</b> — green on the production URL right now (latency, psychology rules, honest badges, no-nag, per-store inventory, holiday scenario…).</li>
+        <li><b>78 automated end-to-end assertions</b> — green on the production URL right now (latency, psychology rules, honest badges &amp; deal math, no-nag, per-store inventory, holiday scenario…).</li>
         <li>Rec moment ≤1.5s; scorer ~70ms; survives total LLM outage.</li>
         <li>Real catalog: <b>106 items crawled live</b> from kfcvietnam.com.vn by TinyFish agents.</li>
       </ul>
@@ -154,9 +154,10 @@
   <div class="tag">5 · Why It Wins</div>
   <div class="kicker">The unfair advantage</div>
   <h2>Same journey — the brain at <u>every</u> step</h2>
-  <div class="jstrip">
+  <div class="jstrip" style="grid-template-columns:repeat(8, 1fr);">
     <div class="jstep"><h4>Attract</h4><p>hot dish of this hour, this store</p></div>
-    <div class="jstep"><h4>Menu grid</h4><p>re-ranks per customer × hour + honest badges</p></div>
+    <div class="jstep"><h4>Menu grid</h4><p>re-ranks per customer × hour + red best-seller tags</p></div>
+    <div class="jstep"><h4>Deal popup</h4><p>agent-picked poster, honest strike price, 1-tap add</p></div>
     <div class="jstep"><h4>Meal size</h4><p>real upgrade stat from local POS</p></div>
     <div class="jstep"><h4>Add on</h4><p>cross-subsidy, sensory pitches, zero wait</p></div>
     <div class="jstep"><h4>Basket</h4><p>cheaper-combo swap FIRST</p></div>
@@ -182,7 +183,7 @@
   <h2 style="font-size:56px;">60 seconds: watch it decide</h2>
   <p style="color:#fff; font-size:23px; font-weight:700; max-width:1250px;">
     0–10s Goal: a customer walks up &nbsp;·&nbsp; 10–20s Trigger: one glance + first taps → hypothesis
-    &nbsp;·&nbsp; 20–45s <b>Agent acts</b>: picks strategy, drink leads, swap saves 12.000₫
+    &nbsp;·&nbsp; 20–45s <b>Agent acts</b>: poster deal pops (−15%, honest strike price), drink leads, swap saves 12.000₫
     &nbsp;·&nbsp; 45–55s Outcome: bigger basket, happier customer &nbsp;·&nbsp; 55–60s Proof: +15% AOV at 13₫/session
   </p>
   <img src="asset-attract.png" style="max-height:38vh; border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.5);" />

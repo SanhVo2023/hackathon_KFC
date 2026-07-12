@@ -375,11 +375,26 @@ let recItemIds = [];
   const r = await api("/api/menu");
   const items = r.body.items ?? [];
   check("menu items carry rank_score", items.every((i) => typeof i.rank_score === "number"));
-  check("each category has exactly one honest badge", (() => {
+  check("badges are selective: every category tagged, never more than 3 per category", (() => {
     const byCat = {};
     for (const i of items) if (i.badge) byCat[i.category] = (byCat[i.category] ?? 0) + 1;
-    return Object.values(byCat).every((n) => n === 1) && Object.keys(byCat).length >= 4;
+    return Object.values(byCat).every((n) => n >= 1 && n <= 4) && Object.keys(byCat).length >= 4;
   })(), JSON.stringify(items.filter((i) => i.badge).map((i) => `${i.name}:${i.badge}`)));
+  check("fast movers surface as Bán chạy beyond the top pick", items.filter((i) => i.badge === "Bán chạy").length >= 2);
+
+  // promo spotlight popup: agent-picked deal with HONEST strike-through math —
+  // the chosen item alone satisfies min_order, so "was X now Y" is literally true
+  const sp = r.body.promo_spotlight;
+  check("menu carries an agent-picked promo spotlight", !!sp, JSON.stringify(sp));
+  if (sp) {
+    check("spotlight strike price is honest (deal < list, item covers min_order)",
+      sp.deal_price < sp.original_price && sp.original_price >= (sp.min_order ?? 0));
+    const expected = sp.kind === "percent"
+      ? Math.round((sp.original_price * (1 - sp.value / 100)) / 1000) * 1000
+      : sp.original_price - sp.value;
+    check("spotlight deal math matches the promo terms", sp.deal_price === expected,
+      `${sp.kind} ${sp.value}: ${sp.original_price} → ${sp.deal_price}, expected ${expected}`);
+  }
   check("badges never expose margin/inventory motives", items.every((i) => !i.badge || ["Bán chạy", "Đang ưu đãi", "Dành cho bạn", "Hợp dịp này"].includes(i.badge) || i.badge.startsWith("Hợp ")));
 
   // no-nag: two unanswered offers → the third slate rests those items
